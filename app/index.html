@@ -337,6 +337,7 @@ input[type=file]#imp-fajl{display:none;}
           </select>
         </div>
         <div style="margin-top:6px;display:flex;flex-direction:column;gap:4px;">
+          <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" id="btn-gemini-key" style="font-size:0.7rem;color:var(--green);border:1px solid var(--green);border-radius:6px;padding:5px 8px;text-align:center;text-decoration:none;">🔑 Get free Gemini API key</a>
           <button class="btn" onclick="appFrissit()" id="btn-app-frissit" style="font-size:0.7rem;color:var(--text2);">🔄 App frissítése</button>
           <button class="btn" onclick="gyariVisszaallitas()" id="btn-gyari" style="font-size:0.7rem;color:var(--red);border-color:var(--red);">⚠ Gyári visszaállítás</button>
         </div>
@@ -619,6 +620,7 @@ const FORD = {
     meret_kis:'Kis', meret_normal:'Normál', meret_nagy:'Nagy', meret_nagyobb:'Nagyobb',
     tip_dontes:'!döntés', tip_otlet:'!ötlet', tip_hiba:'!hiba', tip_projekt:'@projekt',
     app_frissit:'🔄 App frissítése',
+    gemini_key_link:'🔑 Ingyenes Gemini API kulcs',
     gyari_visszaallitas:'⚠ Gyári visszaállítás',
     gyari_confirm:'Törli az összes beállítást és API kulcsot. Az adatbázisod megmarad. Folytatod?',
   },
@@ -661,6 +663,7 @@ const FORD = {
     meret_kis:'Small', meret_normal:'Normal', meret_nagy:'Large', meret_nagyobb:'Larger',
     tip_dontes:'!decision', tip_otlet:'!idea', tip_hiba:'!bug', tip_projekt:'@project',
     app_frissit:'🔄 Update app',
+    gemini_key_link:'🔑 Get free Gemini API key',
     gyari_visszaallitas:'⚠ Factory reset',
     gyari_confirm:'Clears all settings and API key. Your database stays. Continue?',
   },
@@ -1120,6 +1123,7 @@ function langFrissit() {
   // Sidebar
   s('l-betumeret', 'betumeret');
   s('btn-app-frissit', 'app_frissit');
+  const gkl = document.getElementById('btn-gemini-key'); if(gkl) gkl.textContent = tr('gemini_key_link');
   s('btn-gyari', 'gyari_visszaallitas');
   // Bejegyzes tab
   s('l-tartalom', 'tartalom');
