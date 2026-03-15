@@ -1910,11 +1910,15 @@ window.bejMent = async function() {
       await bejegyez({ tartalom: chunk, horgonyok, fontossag, tipus, iro: 'human' });
     document.getElementById('bej-tartalom').value = '';
     document.getElementById('bej-horgonyok').value = '';
+    document.getElementById('bej-tipus').value = '';
+    fontSet(3);
     if (fl) { fl.textContent = '✓ ' + chunks.length + ' db'; setTimeout(() => fl.textContent = '', 3000); }
   } else {
     await bejegyez({ tartalom, horgonyok, fontossag, tipus, iro: 'human' });
     document.getElementById('bej-tartalom').value = '';
     document.getElementById('bej-horgonyok').value = '';
+    document.getElementById('bej-tipus').value = '';
+    fontSet(3);
     const mfl = document.getElementById('mentve-flash');
     if (mfl) { mfl.style.display = 'block'; setTimeout(() => mfl.style.display = 'none', 2000); }
   }
