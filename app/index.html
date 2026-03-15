@@ -351,10 +351,11 @@ input[type=file]#imp-fajl{display:none;}
           <button class="btn" onclick="gyariVisszaallitas()" id="btn-gyari" style="font-size:0.7rem;color:var(--red);border-color:var(--red);">⚠ Gyári visszaállítás</button>
           <div style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
-              <span style="font-size:0.7rem;color:var(--text2);" id="l-a2a">🔗 A2A Protocol</span>
-              <button id="btn-a2a" onclick="a2aToggle()" style="font-size:0.65rem;padding:2px 8px;border-radius:10px;border:1px solid var(--border);background:var(--bg2);color:var(--text2);cursor:pointer;" id="btn-a2a">OFF</button>
+              <span style="font-size:0.7rem;color:var(--text2);" id="l-a2a">🔗 A2A Protocol <span style="font-size:0.6rem;color:var(--orange);border:1px solid var(--orange);border-radius:4px;padding:0 4px;">BETA</span></span>
+              <button id="btn-a2a" onclick="a2aToggle()" style="font-size:0.65rem;padding:2px 8px;border-radius:10px;border:1px solid var(--border);background:var(--bg2);color:var(--text2);cursor:pointer;">OFF</button>
             </div>
             <div style="font-size:0.62rem;color:var(--text2);margin-top:3px;line-height:1.4;" id="l-a2a-info">Engedélyezi külső AI ágensek számára az adatbázis olvasását. Csak akkor kapcsold be, ha tudod kivel osztod meg az adataidat.</div>
+            <div style="font-size:0.6rem;color:var(--orange);margin-top:2px;" id="l-a2a-beta">⚠ Kísérleti funkció – előfordulhat hogy nem működik.</div>
           </div>
         </div>
       </div>
@@ -652,6 +653,7 @@ const FORD = {
     mic_title:'Hangos bevitel',
     a2a_label:'🔗 A2A Protocol',
     a2a_info:'Engedélyezi külső AI ágensek számára az adatbázis olvasását. Csak akkor kapcsold be, ha tudod kivel osztod meg az adataidat.',
+    a2a_beta:'⚠ Kísérleti funkció – előfordulhat hogy nem működik.',
     gemini_key_link:'🔑 Ingyenes Gemini API kulcs',
     claude_key_link:'🔑 Claude API kulcs (~$5)',
     gyari_visszaallitas:'⚠ Gyári visszaállítás',
@@ -703,6 +705,7 @@ const FORD = {
     mic_title:'Voice input',
     a2a_label:'🔗 A2A Protocol',
     a2a_info:'Allows external AI agents to read your database. Only enable if you know who you are sharing your data with.',
+    a2a_beta:'⚠ Experimental feature – may not work yet.',
     gemini_key_link:'🔑 Get free Gemini API key',
     claude_key_link:'🔑 Get Claude API key (~$5)',
     gyari_visszaallitas:'⚠ Factory reset',
@@ -1165,8 +1168,8 @@ function langFrissit() {
   s('l-betumeret', 'betumeret');
   s('btn-app-frissit', 'app_frissit');
   const mb = document.getElementById('mic-btn'); if(mb) mb.title = tr('mic_title');
-  s('l-a2a', 'a2a_label');
   s('l-a2a-info', 'a2a_info');
+  s('l-a2a-beta', 'a2a_beta');
   a2aFrissit();
   const gkl = document.getElementById('btn-gemini-key'); if(gkl) gkl.textContent = tr('gemini_key_link');
   const ckl = document.getElementById('btn-claude-key'); if(ckl) ckl.textContent = tr('claude_key_link');
