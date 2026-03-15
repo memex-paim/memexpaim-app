@@ -2059,7 +2059,7 @@ window.keresFutat = async function() {
   // @horgony → horgony (az @ jel nem tárolódik a horgonyokban)
   const keresQ = (idoEredmeny ? idoEredmeny.maradek : q).replace(/@(\w+)/g, '$1').trim();
 
-  let eredmenyek = keresQ ? await keres(keresQ, 50) : await legutobbi(200, false);
+  let eredmenyek = keresQ ? await keres(keresQ, 50, false) : await legutobbi(200, false);
   if (idoEredmeny) {
     eredmenyek = idoSzuro(eredmenyek, idoEredmeny.tol, idoEredmeny.ig);
     const hint = document.createElement('div');
