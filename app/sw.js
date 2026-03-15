@@ -3,7 +3,7 @@
  * Offline cache: minden statikus fájlt cache-el, hogy internet nélkül is betöltsön
  */
 
-const CACHE_VERSION = 'memex-v4';
+const CACHE_VERSION = 'memex-v5';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -38,12 +38,13 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-  // Külső API hívások: soha ne cache-eljük
+  // Külső API hívások + version.json: soha ne cache-eljük
   if (
     url.hostname.includes('anthropic.com') ||
     url.hostname.includes('googleapis.com') ||
     url.hostname.includes('generativelanguage.googleapis.com') ||
-    url.hostname.includes('openrouter.ai')
+    url.hostname.includes('openrouter.ai') ||
+    url.pathname.includes('version.json')
   ) {
     return; // Alapértelmezett hálózati viselkedés
   }
