@@ -1044,7 +1044,7 @@ const FORD = {
   }
 };
 
-let aktivLang = localStorage.getItem('mx_lang') || 'hu';
+let aktivLang = localStorage.getItem('mx_lang') || 'en';
 
 function tr(k) {
   return (FORD[aktivLang] || FORD.en)[k] || (FORD.en)[k] || (FORD.hu)[k] || k;
