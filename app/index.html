@@ -2069,7 +2069,7 @@ window.keresFutat = async function() {
   }
 
   if (!eredmenyek.length) {
-    lista.innerHTML += '<div class="small">Nincs találat.</div>';
+    lista.innerHTML += `<div class="small">${tr('nincs_tal')}</div>`;
     return;
   }
 
