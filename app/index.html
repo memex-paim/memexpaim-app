@@ -1310,6 +1310,8 @@ window.a2aToggle = function() {
   const be = localStorage.getItem('mx_a2a') === '1';
   if (!be) {
     if (!confirm(tr('a2a_info') + '\n\n' + (aktivLang === 'hu' ? 'Biztosan engedélyezed?' : 'Are you sure you want to enable this?'))) return;
+  } else {
+    if (!confirm(aktivLang === 'hu' ? 'A2A Protocol kikapcsolása – külső ágensek nem férnek hozzá az adatbázishoz.' : 'Disable A2A Protocol – external agents will no longer have access.')) return;
   }
   localStorage.setItem('mx_a2a', be ? '0' : '1');
   a2aFrissit();
