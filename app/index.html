@@ -492,6 +492,7 @@ input[type=file]#imp-fajl{display:none;}
         <button class="pfx" onclick="idoGomb(this)" data-v="@voice" id="ido-voice">🎤 @voice</button>
       </div>
       <div style="font-size:0.68rem;color:var(--text2);padding:2px 0 6px;" id="keres-sugo">Szöveg · @horgony · időszűrő · 🔗 kapcsolódó</div>
+      <div id="keres-horg-chips" style="display:flex;flex-wrap:wrap;gap:4px;padding:0 0 6px;"></div>
       <div id="talalat-lista" class="talalat-lista">
         <div class="small" id="keres-tipp">Írj be kifejezést és nyomj Entert.</div>
       </div>
@@ -2151,6 +2152,22 @@ async function horgChipFrissit() {
   try {
     const top10 = await horgonyLista();
     horgChipRender(top10, document.getElementById('horg-top10'));
+    // Keresés fül chipek – kattintásra keres
+    const keresKontainer = document.getElementById('keres-horg-chips');
+    if (keresKontainer) {
+      keresKontainer.innerHTML = '';
+      top10.forEach(h => {
+        const b = document.createElement('button');
+        b.className = 'pfx';
+        b.style.cssText = 'font-size:0.68rem;padding:2px 6px;width:auto;';
+        b.textContent = '@' + h.horgony;
+        b.onclick = () => {
+          document.getElementById('keres-q').value = '@' + h.horgony;
+          keresFutat();
+        };
+        keresKontainer.appendChild(b);
+      });
+    }
     const osszesLista = document.getElementById('horg-osszes-lista');
     if (osszesLista.style.display !== 'none') {
       const mind = await horgonyListaOsszes();
