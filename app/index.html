@@ -119,8 +119,13 @@ input[type="password"]{letter-spacing:2px;}
 .talalat-lista{display:flex;flex-direction:column;gap:5px;}
 .talalat-item{background:var(--bg1);border:1px solid var(--border);border-radius:6px;padding:8px 11px;}
 .talalat-item:hover{border-color:var(--accent);}
-.talalat-meta{font-size:0.68rem;color:var(--text2);margin-bottom:3px;display:flex;gap:5px;flex-wrap:wrap;}
+.talalat-meta{font-size:0.68rem;color:var(--text2);margin-bottom:3px;display:flex;gap:5px;flex-wrap:wrap;align-items:center;}
 .talalat-szoveg{font-size:0.8rem;}
+.kapcsolodo-btn{background:none;border:1px solid var(--border);border-radius:4px;color:var(--text2);font-size:0.65rem;padding:1px 5px;cursor:pointer;margin-left:auto;}
+.kapcsolodo-btn:hover{border-color:var(--accent);color:var(--accent);}
+.kapcsolodo-lista{margin-top:6px;padding-top:6px;border-top:1px dashed var(--border);display:flex;flex-direction:column;gap:4px;}
+.kapcsolodo-item{font-size:0.75rem;color:var(--text2);padding:3px 6px;border-left:2px solid var(--border);}
+.ido-hint{font-size:0.7rem;color:var(--accent);padding:2px 0 4px;}
 .iro-h{color:var(--accent);}.iro-ai{color:var(--purple);}
 .bej-panel{flex:1;padding:14px;overflow-y:auto;display:flex;flex-direction:column;gap:9px;}
 .bej-panel textarea{height:110px;resize:vertical;}
@@ -612,7 +617,10 @@ const FORD = {
     help_h4:'Export / Import', help_p4:'Biztonsági mentés fájlba. Jelszó opcionális – ha elfelejted, az export fájl olvashatatlan lesz, de az adatbázisod a telefonon megmarad.',
     session_horg:'Chat ablak aktív horgony',
     session_horg_ph:'@horgony @horgony2 …',
-    keres_tipp:'Írj be kifejezést és nyomj Entert.',
+    keres_tipp:'Írj be kifejezést és nyomj Entert. Időszűrő: "tegnap", "múlt héten", "3 napja", "januárban"',
+    kapcsolodo:'🔗 kapcsolódó',
+    kapcsolodo_nincs:'Nincs kapcsolódó bejegyzés.',
+    ido_szuro:'Időszűrő aktív:',
     fajl_valaszt:'Fájl kiválasztása…',
     f_kritikus:'🔴 Kritikus', f_fontos:'🟡 Fontos', f_normal:'🟢 Normál', f_duma:'⚪ Duma',
     exp_leiras:'🔒 Opcionális. Ha elfelejted: az export fájl olvashatatlan lesz, de az adatbázisod a telefonon megmarad.',
@@ -657,7 +665,10 @@ const FORD = {
     help_h4:'Export / Import', help_p4:'Backup to a file. Password is optional – if you forget it, the export file will be unreadable, but your database on the device remains intact.',
     session_horg:'Active chat anchor',
     session_horg_ph:'@anchor @anchor2 …',
-    keres_tipp:'Type a term and press Enter.',
+    keres_tipp:'Type a term and press Enter. Time filters: "yesterday", "last week", "3 days ago", "in January"',
+    kapcsolodo:'🔗 related',
+    kapcsolodo_nincs:'No related entries.',
+    ido_szuro:'Time filter active:',
     fajl_valaszt:'Choose file…',
     f_kritikus:'🔴 Critical', f_fontos:'🟡 Important', f_normal:'🟢 Normal', f_duma:'⚪ Casual',
     exp_leiras:'🔒 Optional. If you forget it: the export file will be unreadable, but your database on the device remains intact.',
@@ -1829,6 +1840,122 @@ window.bejMent = async function() {
   await statFrissit();
 };
 
+// ── Keresés – időszűrő parser ─────────────────────────────────────────────────
+
+function idoParse(q) {
+  const ma = new Date(); ma.setHours(0,0,0,0);
+  const holnap = new Date(ma); holnap.setDate(holnap.getDate()+1);
+  let tol = null, ig = null, maradek = q;
+
+  const honap = {
+    januar:0,january:0,jan:0, februar:1,february:1,feb:1,
+    marcius:2,march:2,mar:2, aprilis:3,april:3,apr:3,
+    majus:4,may:4, junius:5,june:5,jun:5,
+    julius:6,july:6,jul:6, augusztus:7,august:7,aug:7,
+    szeptember:8,september:8,sep:8, oktober:9,october:9,oct:9,
+    november:10,nov:10, december:11,dec:11
+  };
+
+  // "tegnap" / "yesterday"
+  if (/\b(tegnap|yesterday)\b/i.test(q)) {
+    tol = new Date(ma); tol.setDate(tol.getDate()-1); ig = new Date(ma);
+    maradek = q.replace(/\b(tegnap|yesterday)\b/i,'').trim();
+  }
+  // "ma" / "today"
+  else if (/\b(ma|today)\b/i.test(q)) {
+    tol = new Date(ma); ig = new Date(holnap);
+    maradek = q.replace(/\b(ma|today)\b/i,'').trim();
+  }
+  // "múlt héten" / "last week" / "ezen a héten" / "this week"
+  else if (/\b(m[uú]lt\s+h[eé]ten|last\s+week)\b/i.test(q)) {
+    tol = new Date(ma); tol.setDate(tol.getDate()-7); ig = new Date(holnap);
+    maradek = q.replace(/\b(m[uú]lt\s+h[eé]ten|last\s+week)\b/i,'').trim();
+  }
+  else if (/\b(ezen\s+a\s+h[eé]ten|this\s+week)\b/i.test(q)) {
+    tol = new Date(ma); tol.setDate(tol.getDate()-tol.getDay()); ig = new Date(holnap);
+    maradek = q.replace(/\b(ezen\s+a\s+h[eé]ten|this\s+week)\b/i,'').trim();
+  }
+  // "múlt hónapban" / "last month"
+  else if (/\b(m[uú]lt\s+h[oó]napban|last\s+month)\b/i.test(q)) {
+    tol = new Date(ma); tol.setDate(tol.getDate()-30); ig = new Date(holnap);
+    maradek = q.replace(/\b(m[uú]lt\s+h[oó]napban|last\s+month)\b/i,'').trim();
+  }
+  // "N napja" / "N days ago"
+  else {
+    const m1 = q.match(/\b(\d+)\s*(nap(?:ja)?|days?\s*ago)\b/i);
+    if (m1) { tol = new Date(ma); tol.setDate(tol.getDate()-parseInt(m1[1])); ig = new Date(holnap); maradek = q.replace(m1[0],'').trim(); }
+    // "N hete" / "N weeks ago"
+    const m2 = q.match(/\b(\d+)\s*(het[e]?|weeks?\s*ago)\b/i);
+    if (m2) { tol = new Date(ma); tol.setDate(tol.getDate()-parseInt(m2[1])*7); ig = new Date(holnap); maradek = q.replace(m2[0],'').trim(); }
+    // "N hónapja" / "N months ago"
+    const m3 = q.match(/\b(\d+)\s*(h[oó]nap(?:ja)?|months?\s*ago)\b/i);
+    if (m3) { tol = new Date(ma); tol.setMonth(tol.getMonth()-parseInt(m3[1])); ig = new Date(holnap); maradek = q.replace(m3[0],'').trim(); }
+    // Hónap neve: "januárban", "in january"
+    const m4 = q.match(/\b(?:in\s+)?(januar[a-z]*|februar[a-z]*|marcius[a-z]*|aprilis[a-z]*|majus[a-z]*|junius[a-z]*|julius[a-z]*|augusztus[a-z]*|szeptember[a-z]*|oktober[a-z]*|november[a-z]*|december[a-z]*|january|february|march|april|may|june|july|august|september|october|november|dec)\b/i);
+    if (m4) {
+      const kulcs = m4[1].toLowerCase().replace(/[áéíóöőúüű]/g, c => ({'á':'a','é':'e','í':'i','ó':'o','ö':'o','ő':'o','ú':'u','ü':'u','ű':'u'}[c]||c)).replace(/ban$|ben$/,'');
+      const hIdx = honap[kulcs];
+      if (hIdx !== undefined) {
+        const ev = new Date().getFullYear();
+        tol = new Date(ev, hIdx, 1); ig = new Date(ev, hIdx+1, 1);
+        maradek = q.replace(m4[0],'').trim();
+      }
+    }
+  }
+  return tol ? { tol, ig, maradek } : null;
+}
+
+function idoSzuro(eredmenyek, tol, ig) {
+  return eredmenyek.filter(r => {
+    const d = new Date(r.idobelyeg);
+    return d >= tol && d < ig;
+  });
+}
+
+// ── Kapcsolódó bejegyzések ────────────────────────────────────────────────────
+
+async function kapcsolodoKeres(forras, kizartSorszam) {
+  const horgonyok = JSON.parse(forras.horgonyok || '[]').filter(h => h !== 'chat' && h !== 'voice');
+  const szavak = forras.tartalom.replace(/^[KV]: /,'').toLowerCase()
+    .split(/\s+/).filter(s => s.length > 4).slice(0, 8);
+
+  if (!horgonyok.length && !szavak.length) return [];
+
+  const osszes = await keres(szavak[0] || horgonyok[0] || '', 50);
+  return osszes
+    .filter(r => r.sorszam !== kizartSorszam)
+    .filter(r => {
+      const rH = JSON.parse(r.horgonyok || '[]');
+      const vanHorgony = horgonyok.some(h => rH.includes(h));
+      const vanSzo = szavak.some(s => r.tartalom.toLowerCase().includes(s));
+      return vanHorgony || vanSzo;
+    })
+    .slice(0, 3);
+}
+
+window.kapcsolodoMutat = async function(sorszam, tartalom, horgonyok, btn) {
+  const szulo = btn.closest('.talalat-item');
+  let lista = szulo.querySelector('.kapcsolodo-lista');
+  if (lista) { lista.remove(); btn.textContent = tr('kapcsolodo'); return; }
+
+  btn.textContent = '⏳';
+  const kapcsolodok = await kapcsolodoKeres({ sorszam, tartalom, horgonyok }, sorszam);
+  lista = document.createElement('div');
+  lista.className = 'kapcsolodo-lista';
+  if (!kapcsolodok.length) {
+    lista.innerHTML = `<div class="kapcsolodo-item">${tr('kapcsolodo_nincs')}</div>`;
+  } else {
+    kapcsolodok.forEach(r => {
+      const d = document.createElement('div');
+      d.className = 'kapcsolodo-item';
+      d.textContent = r.idobelyeg?.slice(0,10) + ' – ' + r.tartalom.slice(0,100);
+      lista.appendChild(d);
+    });
+  }
+  szulo.appendChild(lista);
+  btn.textContent = tr('kapcsolodo');
+};
+
 // ── Keresés ───────────────────────────────────────────────────────────────────
 
 window.keresFutat = async function() {
@@ -1837,20 +1964,39 @@ window.keresFutat = async function() {
   if (!q) return;
   const lista = document.getElementById('talalat-lista');
   lista.innerHTML = '';
-  const eredmenyek = await keres(q, 20);
+
+  const idoEredmeny = idoParse(q);
+  const keresQ = idoEredmeny ? idoEredmeny.maradek : q;
+
+  let eredmenyek = keresQ ? await keres(keresQ, 50) : await legutobbi(200, false);
+  if (idoEredmeny) {
+    eredmenyek = idoSzuro(eredmenyek, idoEredmeny.tol, idoEredmeny.ig);
+    const hint = document.createElement('div');
+    hint.className = 'ido-hint';
+    hint.textContent = tr('ido_szuro') + ' ' + idoEredmeny.tol.toLocaleDateString() + ' – ' + idoEredmeny.ig.toLocaleDateString();
+    lista.appendChild(hint);
+  }
+
   if (!eredmenyek.length) {
-    lista.innerHTML = '<div class="small">Nincs találat.</div>';
+    lista.innerHTML += '<div class="small">Nincs találat.</div>';
     return;
   }
-  eredmenyek.forEach(r => {
+
+  eredmenyek.slice(0,30).forEach(r => {
+    const hArr = JSON.parse(r.horgonyok || '[]');
     const div = document.createElement('div');
     div.className = 'talalat-item';
     const meta = document.createElement('div');
     meta.className = 'talalat-meta';
+    const kBtn = document.createElement('button');
+    kBtn.className = 'kapcsolodo-btn';
+    kBtn.textContent = tr('kapcsolodo');
+    kBtn.onclick = () => kapcsolodoMutat(r.sorszam, r.tartalom, r.horgonyok, kBtn);
     meta.innerHTML = `<span class="${r.iro==='human'?'iro-h':'iro-ai'}">${r.iro||'?'}</span>
       <span>${r.idobelyeg?.slice(0,10)||''}</span>
       <span style="color:var(--orange)">${r.tipus||''}</span>
-      <span style="color:var(--text2)">${JSON.parse(r.horgonyok||'[]').join(' ')}</span>`;
+      <span style="color:var(--text2)">${hArr.join(' ')}</span>`;
+    meta.appendChild(kBtn);
     const szoveg = document.createElement('div');
     szoveg.className = 'talalat-szoveg';
     szoveg.textContent = r.tartalom;
