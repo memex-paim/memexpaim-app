@@ -200,6 +200,11 @@ export async function horgonyLista() {
   return ossz.sort((a, b) => b.darab - a.darab).slice(0, 10);
 }
 
+export async function horgonyListaOsszes() {
+  const ossz = await idbGetAll('horgony_stat');
+  return ossz.sort((a, b) => b.darab - a.darab);
+}
+
 export async function nevjegySet(kulcs, ertek) {
   await idbPut('nevjegy', { kulcs, ertek });
 }
