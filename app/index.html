@@ -2048,7 +2048,8 @@ window.keresFutat = async function() {
   lista.innerHTML = '';
 
   const idoEredmeny = idoParse(q);
-  const keresQ = idoEredmeny ? idoEredmeny.maradek : q;
+  // @horgony → horgony (az @ jel nem tárolódik a horgonyokban)
+  const keresQ = (idoEredmeny ? idoEredmeny.maradek : q).replace(/@(\w+)/g, '$1').trim();
 
   let eredmenyek = keresQ ? await keres(keresQ, 50) : await legutobbi(200, false);
   if (idoEredmeny) {
