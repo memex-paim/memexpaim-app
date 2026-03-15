@@ -230,20 +230,13 @@ input[type=file]#imp-fajl{display:none;}
 <!-- HEADER -->
 <header>
   <button class="hbtn" onclick="sidebarToggle()">☰</button>
-  <h1>Memex Paim</h1>
+  <h1>M·P</h1>
   <div class="conn-info" id="conn-info">
     <span id="conn-dot" class="dot-warn">●</span>
     <span id="conn-text"> Betölt…</span>
   </div>
   <div class="header-right">
     <button id="update-badge" onclick="location.reload()" style="display:none;font-size:0.65rem;background:var(--orange);color:#fff;border:none;border-radius:10px;padding:2px 8px;cursor:pointer;animation:mic-pulse 2s infinite;" title="New version available">🆕 Update</button>
-    <div class="skin-dots">
-      <div class="sdot on"  style="background:#161b22;" onclick="skinSet('')"       title="Sötét"></div>
-      <div class="sdot"     style="background:#f6f8fa;" onclick="skinSet('light')"  title="Világos"></div>
-      <div class="sdot"     style="background:#112219;" onclick="skinSet('forest')" title="Erdő"></div>
-      <div class="sdot"     style="background:#0a1628;" onclick="skinSet('ocean')"  title="Óceán"></div>
-      <div class="sdot"     style="background:#1a1800;" onclick="skinSet('amber')"  title="Borostyán"></div>
-    </div>
     <div class="memex-toggle on" id="memex-toggle" onclick="memexToggle()">
       <div class="toggle-dot"></div>
       <span class="toggle-label" id="toggle-label">BE</span>
@@ -371,6 +364,16 @@ input[type=file]#imp-fajl{display:none;}
             <option value="18">Nagy</option>
             <option value="20">Nagyobb</option>
           </select>
+        </div>
+        <div style="margin-top:6px;">
+          <label>Téma</label>
+          <div class="skin-dots" style="margin-top:4px;">
+            <div class="sdot on"  style="background:#161b22;" onclick="skinSet('')"       title="Sötét"></div>
+            <div class="sdot"     style="background:#f6f8fa;" onclick="skinSet('light')"  title="Világos"></div>
+            <div class="sdot"     style="background:#112219;" onclick="skinSet('forest')" title="Erdő"></div>
+            <div class="sdot"     style="background:#0a1628;" onclick="skinSet('ocean')"  title="Óceán"></div>
+            <div class="sdot"     style="background:#1a1800;" onclick="skinSet('amber')"  title="Borostyán"></div>
+          </div>
         </div>
         <div style="margin-top:6px;display:flex;flex-direction:column;gap:4px;">
           <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" id="btn-gemini-key" style="font-size:0.7rem;color:var(--green);border:1px solid var(--green);border-radius:6px;padding:5px 8px;text-align:center;text-decoration:none;">🔑 Get free Gemini API key</a>
@@ -1447,7 +1450,8 @@ window.apiValtozas = function() {
   const txt = document.getElementById('conn-text');
   if (_dbKesz) {
     dot.className = t === 'offline' || !k ? 'dot-warn' : 'dot-ok';
-    txt.textContent = ' ' + (t === 'offline' ? tr('offline_mod') : k ? t + tr('kesz') : t + tr('kulcs_hianyz'));
+    const modell = localStorage.getItem('mx_model_' + t) || t;
+    txt.textContent = ' ' + (t === 'offline' ? tr('offline_mod') : k ? modell : t + tr('kulcs_hianyz'));
   }
 };
 // Event listenerek – megbízhatóbbak mint onchange="" module contextben
