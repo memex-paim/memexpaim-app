@@ -1,0 +1,30 @@
+{
+  "name": "Memex PAIM",
+  "description": "Personal AI Memory – offline-first PWA that stores and retrieves personal knowledge on the user's device. No server, no cloud.",
+  "url": "https://memexpaim.com",
+  "version": "1.0.0-alpha",
+  "protocol": "a2a",
+  "status": "experimental",
+  "capabilities": {
+    "store": {
+      "description": "Store a memory entry with optional anchors, priority and type",
+      "input": ["text", "anchors", "priority", "type"]
+    },
+    "search": {
+      "description": "Search stored memories by keyword, anchor or time filter",
+      "input": ["query", "limit"],
+      "filters": ["@anchor", "yesterday", "last week", "last month", "N days ago"]
+    },
+    "export": {
+      "description": "Export all memories as encrypted .memex file – always free",
+      "note": "GDPR compliant, data stays on user device"
+    }
+  },
+  "privacy": {
+    "data_location": "user_device_only",
+    "server": false,
+    "cloud": false,
+    "training": false
+  },
+  "contact": "https://memexpaim.com"
+}
