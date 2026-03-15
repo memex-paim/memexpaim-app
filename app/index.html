@@ -2118,9 +2118,11 @@ window.exportFutat = async function() {
   el.textContent = '…';
   try {
     await exportMemex(jelszo);
-    el.innerHTML = '<span style="color:var(--green)">✓ Letöltés elkezdve</span>';
+    el.innerHTML = '<span style="color:var(--green)">' + tr('mentve') + '</span>';
+    setTimeout(() => { el.textContent = ''; }, 3000);
   } catch(e) {
-    el.textContent = 'Hiba: ' + e.message;
+    el.textContent = '⚠ ' + e.message;
+    setTimeout(() => { el.textContent = ''; }, 5000);
   }
 };
 
