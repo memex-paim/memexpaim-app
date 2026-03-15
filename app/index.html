@@ -449,6 +449,7 @@ input[type=file]#imp-fajl{display:none;}
         <button class="pfx" onclick="idoGomb(this)" data-v="last month">🗓 last month</button>
         <button class="pfx" onclick="idoGomb(this)" data-v="@voice">🎤 @voice</button>
       </div>
+      <div style="font-size:0.68rem;color:var(--text2);padding:2px 0 6px;" id="keres-sugo">Szöveg · @horgony · időszűrő · 🔗 kapcsolódó</div>
       <div id="talalat-lista" class="talalat-lista">
         <div class="small" id="keres-tipp">Írj be kifejezést és nyomj Entert.</div>
       </div>
@@ -625,6 +626,7 @@ const FORD = {
     session_horg:'Chat ablak aktív horgony',
     session_horg_ph:'@horgony @horgony2 …',
     keres_tipp:'Írj be kifejezést és nyomj Entert. Időszűrő: "tegnap", "múlt héten", "3 napja", "januárban"',
+    keres_sugo:'Szöveg · @horgony · időszűrő · 🔗 kapcsolódó',
     kapcsolodo:'🔗 kapcsolódó',
     kapcsolodo_nincs:'Nincs kapcsolódó bejegyzés.',
     ido_szuro:'Időszűrő aktív:',
@@ -673,6 +675,7 @@ const FORD = {
     session_horg:'Active chat anchor',
     session_horg_ph:'@anchor @anchor2 …',
     keres_tipp:'Type a term and press Enter. Time filters: "yesterday", "last week", "3 days ago", "in January"',
+    keres_sugo:'Text · @anchor · time filter · 🔗 related',
     kapcsolodo:'🔗 related',
     kapcsolodo_nincs:'No related entries.',
     ido_szuro:'Time filter active:',
@@ -1169,6 +1172,7 @@ function langFrissit() {
   s('f1', 'f_kritikus'); s('f2', 'f_fontos'); s('f3', 'f_normal'); s('f4', 'f_duma');
   // Search tab
   s('keres-tipp', 'keres_tipp');
+  s('keres-sugo', 'keres_sugo');
   // Export tab
   s('l-db-free', 'db_free');
   s('l-db-paid', 'db_paid');
