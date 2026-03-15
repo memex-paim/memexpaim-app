@@ -622,14 +622,19 @@ window.gyariVisszaallitas = async function() {
 
 // ── Font méret ────────────────────────────────────────────────────────────────
 
+function _fontApply(sz) {
+  let el = document.getElementById('_font_style');
+  if (!el) { el = document.createElement('style'); el.id = '_font_style'; document.head.appendChild(el); }
+  el.textContent = `html { font-size: ${sz}px !important; }`;
+}
 window.fontSizeSet = function(sz) {
   localStorage.setItem('mx_fontsize', sz);
-  document.documentElement.style.fontSize = sz + 'px';
+  _fontApply(sz);
 };
 (function(){
   const fs = localStorage.getItem('mx_fontsize') || '16';
   document.getElementById('font-size').value = fs;
-  document.documentElement.style.fontSize = fs + 'px';
+  _fontApply(fs);
 })();
 
 // ── Sidebar ───────────────────────────────────────────────────────────────────
