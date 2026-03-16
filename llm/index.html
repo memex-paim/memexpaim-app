@@ -9,12 +9,13 @@
 
   :root {
     --bg: #1a1a1a;
-    --bg2: #141414;
-    --bg3: #252525;
+    --bg2: #1a1a1a;
+    --bg3: #222222;
     --text: #e8e8e8;
-    --text2: #a0a0a0;
-    --text3: #606060;
-    --border: #2e2e2e;
+    --text2: #888888;
+    --text3: #505050;
+    --border: #2a2a2a;
+    --input-border: #272727;
     --accent: #4f8ef7;
     --sidebar-w: 220px;
   }
@@ -34,7 +35,7 @@
     width: var(--sidebar-w);
     min-width: var(--sidebar-w);
     background: var(--bg2);
-    border-right: 1px solid var(--border);
+    border-right: none;
     display: flex;
     flex-direction: column;
     padding: 20px 0;
@@ -50,7 +51,7 @@
     font-weight: 600;
     color: var(--text2);
     letter-spacing: 0.02em;
-    border-bottom: 1px solid var(--border);
+    border-bottom: none;
     margin-bottom: 12px;
   }
 
@@ -90,7 +91,7 @@
     display: flex;
     align-items: center;
     padding: 12px 20px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: none;
     gap: 12px;
     flex-shrink: 0;
   }
@@ -213,15 +214,17 @@
   #input-box {
     display: flex;
     align-items: flex-end;
-    border: 1px solid var(--border);
+    border: 1px solid var(--input-border);
     border-radius: 12px;
-    background: var(--bg);
+    background: var(--bg3);
     padding: 10px 14px;
     gap: 10px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    box-shadow: none;
   }
 
-  #input-box:focus-within { border-color: #4f8ef7; box-shadow: 0 0 0 3px #1e3a6e44; }
+  #input-box:focus-within { border-color: #333333; }
+
+  #user-input { background: transparent; }
 
   #user-input {
     flex: 1;
