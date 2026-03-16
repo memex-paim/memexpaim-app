@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.memexpaim.app",
+        "sha256_cert_fingerprints": ["6A:C9:C8:29:E8:14:6B:5A:C5:7C:F7:D8:FC:06:BF:94:BF:E8:CB:21:DF:21:36:66:F2:25:38:84:AC:82:AB:2E"]
+      }
+    }]
