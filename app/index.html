@@ -524,6 +524,7 @@ input[type=file]#imp-fajl{display:none;}
         <button class="pfx" onclick="idoGomb(this)" data-v="last week" id="ido-het">📆 last week</button>
         <button class="pfx" onclick="idoGomb(this)" data-v="last month" id="ido-honap">🗓 last month</button>
         <button class="pfx" onclick="idoGomb(this)" data-v="@voice" id="ido-voice">🎤 @voice</button>
+        <button class="pfx" onclick="osszesMutat()" id="btn-osszes" style="margin-left:auto;">📋 All</button>
       </div>
       <div style="font-size:0.68rem;color:var(--text2);padding:2px 0 6px;" id="keres-sugo">Szöveg · @horgony · időszűrő · 🔗 kapcsolódó</div>
       <div id="keres-horg-chips" style="display:flex;flex-wrap:wrap;gap:4px;padding:0 0 4px;"></div>
@@ -2297,6 +2298,48 @@ window.keresFutat = async function() {
   lista.appendChild(szamlalo);
 
   eredmenyek.slice(0,30).forEach(r => {
+    const hArr = JSON.parse(r.horgonyok || '[]');
+    const div = document.createElement('div');
+    div.className = 'talalat-item';
+    const meta = document.createElement('div');
+    meta.className = 'talalat-meta';
+    const kBtn = document.createElement('button');
+    kBtn.className = 'kapcsolodo-btn';
+    kBtn.textContent = tr('kapcsolodo');
+    kBtn.onclick = () => kapcsolodoMutat(r.sorszam, r.tartalom, r.horgonyok, kBtn);
+    meta.innerHTML = `<span class="${r.iro==='human'?'iro-h':'iro-ai'}">${r.iro||'?'}</span>
+      <span>${r.idobelyeg?.slice(0,10)||''}</span>
+      <span style="color:var(--orange)">${r.tipus||''}</span>
+      <span style="color:var(--text2)">${hArr.join(' ')}</span>`;
+    meta.appendChild(kBtn);
+    const szoveg = document.createElement('div');
+    szoveg.className = 'talalat-szoveg';
+    szoveg.textContent = r.tartalom;
+    div.appendChild(meta);
+    div.appendChild(szoveg);
+    lista.appendChild(div);
+  });
+};
+
+window.osszesMutat = async function() {
+  if (!_dbKesz) return;
+  document.getElementById('keres-q').value = '';
+  const lista = document.getElementById('talalat-lista');
+  lista.innerHTML = '';
+
+  const mindenki = (await legutobbi(9999, false)).sort((a, b) => b.sorszam - a.sorszam);
+
+  const limit = 500;
+  const db_count = mindenki.length;
+  const mutat = Math.min(db_count, limit);
+
+  const szamlalo = document.createElement('div');
+  szamlalo.className = 'small';
+  szamlalo.style.cssText = 'color:var(--text2);padding:2px 0 6px;';
+  szamlalo.textContent = db_count > limit ? `${mutat} / ${db_count}` : `${db_count}`;
+  lista.appendChild(szamlalo);
+
+  mindenki.slice(0, limit).forEach(r => {
     const hArr = JSON.parse(r.horgonyok || '[]');
     const div = document.createElement('div');
     div.className = 'talalat-item';
