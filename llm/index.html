@@ -5,261 +5,475 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Memex LLM</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #ffffff;
+    --bg2: #f7f7f8;
+    --bg3: #efefef;
+    --text: #1a1a1a;
+    --text2: #6b7280;
+    --text3: #9ca3af;
+    --border: #e5e7eb;
+    --accent: #2563eb;
+    --sidebar-w: 220px;
+  }
 
   body {
-    background: #0a0a0a;
-    color: #00ff41;
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 14px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+    font-size: 15px;
+    background: var(--bg);
+    color: var(--text);
     height: 100dvh;
     display: flex;
-    flex-direction: column;
     overflow: hidden;
   }
 
-  #header {
-    padding: 8px 12px;
-    border-bottom: 1px solid #00ff4133;
-    color: #00ff41;
-    font-size: 11px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-shrink: 0;
-  }
-
-  #header .title { color: #00ff41; font-weight: bold; letter-spacing: 2px; }
-  #header .status { color: #00ff4188; font-size: 10px; }
-
-  #terminal {
-    flex: 1;
-    overflow-y: auto;
-    padding: 12px;
+  /* ── Sidebar ── */
+  #sidebar {
+    width: var(--sidebar-w);
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    scroll-behavior: smooth;
+    padding: 20px 0;
+    flex-shrink: 0;
+    transform: translateX(0);
+    transition: transform 0.2s ease;
   }
 
-  .line { line-height: 1.6; word-break: break-word; }
-  .line.sys  { color: #00ff4166; font-size: 11px; }
-  .line.user { color: #ffffff; }
-  .line.user::before { content: '> '; color: #00ff41; }
-  .line.ai   { color: #00ff41; }
-  .line.ai::before { content: '» '; color: #00cc33; }
-  .line.err  { color: #ff4444; }
-  .line.info { color: #ffaa00; }
+  #sidebar.hidden { transform: translateX(calc(-1 * var(--sidebar-w))); }
 
-  #progress-wrap {
-    padding: 4px 12px 8px;
+  .sidebar-logo {
+    padding: 0 20px 24px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text2);
+    letter-spacing: 0.02em;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 12px;
+  }
+
+  .sidebar-logo span { color: var(--text3); font-weight: 400; }
+
+  .nav-item {
+    padding: 9px 20px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--text2);
+    border-radius: 0;
+    transition: background 0.1s, color 0.1s;
+    user-select: none;
+  }
+
+  .nav-item:hover { background: var(--bg3); color: var(--text); }
+  .nav-item.active { color: var(--text); font-weight: 500; background: var(--bg3); }
+
+  .sidebar-footer {
+    margin-top: auto;
+    padding: 16px 20px;
+    font-size: 11px;
+    color: var(--text3);
+  }
+
+  /* ── Main ── */
+  #main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* ── Topbar ── */
+  #topbar {
+    display: flex;
+    align-items: center;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    gap: 12px;
     flex-shrink: 0;
+  }
+
+  #menu-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text2);
+    font-size: 18px;
+    padding: 2px 4px;
+    line-height: 1;
+  }
+
+  #menu-btn:hover { color: var(--text); }
+
+  #topbar-title {
+    font-size: 14px;
+    color: var(--text2);
+    flex: 1;
+  }
+
+  #status-badge {
+    font-size: 11px;
+    color: var(--text3);
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 2px 10px;
+  }
+
+  #toks-display {
+    font-size: 11px;
+    color: var(--text3);
+  }
+
+  /* ── Panels ── */
+  .panel { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+  .panel.active { display: flex; }
+
+  /* ── Chat panel ── */
+  #chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px 0;
+  }
+
+  #chat-messages::-webkit-scrollbar { width: 4px; }
+  #chat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .msg {
+    max-width: 680px;
+    margin: 0 auto 20px;
+    padding: 0 24px;
+    line-height: 1.65;
+    font-size: 15px;
+  }
+
+  .msg.user { color: var(--text); }
+  .msg.ai { color: var(--text); }
+
+  .msg-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text3);
+    margin-bottom: 4px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .msg.user .msg-label { color: var(--accent); }
+
+  .msg-body { color: var(--text); }
+  .msg.ai .msg-body { color: var(--text2); }
+
+  .msg-divider {
+    max-width: 680px;
+    margin: 0 auto 20px;
+    padding: 0 24px;
+    border-top: 1px solid var(--border);
+  }
+
+  /* progress */
+  #progress-wrap {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 0 24px 16px;
     display: none;
   }
 
   #progress-bar-outer {
     width: 100%;
-    height: 6px;
-    background: #0f2f0f;
-    border: 1px solid #00ff4133;
-    border-radius: 3px;
+    height: 3px;
+    background: var(--bg3);
+    border-radius: 2px;
     overflow: hidden;
   }
 
   #progress-bar-inner {
     height: 100%;
     width: 0%;
-    background: #00ff41;
+    background: var(--accent);
     transition: width 0.3s;
   }
 
   #progress-text {
-    font-size: 10px;
-    color: #00ff4188;
-    margin-top: 3px;
-    text-align: center;
+    font-size: 11px;
+    color: var(--text3);
+    margin-top: 6px;
   }
 
-  #input-row {
+  /* ── Chat input ── */
+  #chat-input-wrap {
+    padding: 16px 24px 20px;
+    max-width: 680px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  #input-box {
     display: flex;
-    align-items: center;
-    padding: 8px 12px;
-    border-top: 1px solid #00ff4133;
-    gap: 8px;
-    flex-shrink: 0;
+    align-items: flex-end;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg);
+    padding: 10px 14px;
+    gap: 10px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   }
 
-  #prompt-sign { color: #00ff41; flex-shrink: 0; }
+  #input-box:focus-within { border-color: #93c5fd; box-shadow: 0 0 0 3px #dbeafe; }
 
   #user-input {
     flex: 1;
-    background: transparent;
     border: none;
     outline: none;
-    color: #ffffff;
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 14px;
-    caret-color: #00ff41;
+    background: transparent;
+    font-family: inherit;
+    font-size: 15px;
+    color: var(--text);
+    resize: none;
+    min-height: 24px;
+    max-height: 120px;
+    line-height: 1.5;
   }
 
-  #user-input::placeholder { color: #00ff4133; }
+  #user-input::placeholder { color: var(--text3); }
 
   #send-btn {
-    background: none;
-    border: 1px solid #00ff4144;
-    color: #00ff41;
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 12px;
-    padding: 4px 10px;
+    background: var(--accent);
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 6px 14px;
     cursor: pointer;
-    border-radius: 2px;
     flex-shrink: 0;
+    transition: background 0.1s;
   }
 
-  #send-btn:hover { background: #00ff4111; }
-  #send-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  #send-btn:hover { background: #1d4ed8; }
+  #send-btn:disabled { background: var(--bg3); color: var(--text3); cursor: not-allowed; }
 
-  .cursor {
-    display: inline-block;
-    width: 8px;
-    height: 14px;
-    background: #00ff41;
-    animation: blink 1s step-end infinite;
-    vertical-align: text-bottom;
-    margin-left: 1px;
+  /* ── Placeholder panels ── */
+  .panel-placeholder {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: var(--text3);
+    font-size: 14px;
   }
-  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
 
-  #terminal::-webkit-scrollbar { width: 4px; }
-  #terminal::-webkit-scrollbar-track { background: #0a0a0a; }
-  #terminal::-webkit-scrollbar-thumb { background: #00ff4133; border-radius: 2px; }
+  .panel-placeholder strong {
+    font-size: 16px;
+    color: var(--text2);
+    font-weight: 500;
+  }
+
+  /* ── Watermark ── */
+  #watermark {
+    position: fixed;
+    bottom: 10px;
+    right: 14px;
+    font-size: 10px;
+    color: var(--text3);
+    opacity: 0.5;
+    pointer-events: none;
+    letter-spacing: 0.03em;
+  }
+
+  /* ── Mobile ── */
+  @media (max-width: 600px) {
+    #sidebar { position: absolute; left: 0; top: 0; height: 100%; z-index: 100; box-shadow: 2px 0 12px rgba(0,0,0,0.08); }
+    #sidebar.hidden { transform: translateX(-100%); }
+  }
 </style>
 </head>
 <body>
 
-<div id="header">
-  <span class="title">MEMEX LLM</span>
-  <span class="status">
-    <span id="status-text">INITIALIZING...</span>
-    <span id="toks-display" style="margin-left:10px;color:#00ff4155;display:none;">0 tok/s</span>
-  </span>
+<!-- Sidebar -->
+<div id="sidebar">
+  <div class="sidebar-logo">Memex <span>LLM</span></div>
+  <div class="nav-item active" onclick="showPanel('chat')">Chat</div>
+  <div class="nav-item" onclick="showPanel('search')">Search</div>
+  <div class="nav-item" onclick="showPanel('entry')">Entry</div>
+  <div class="nav-item" onclick="showPanel('database')">Database</div>
+  <div class="sidebar-footer" id="model-footer">Loading...</div>
 </div>
 
-<div id="terminal"></div>
+<!-- Main -->
+<div id="main">
 
-<div id="progress-wrap">
-  <div id="progress-bar-outer">
-    <div id="progress-bar-inner"></div>
+  <!-- Topbar -->
+  <div id="topbar">
+    <button id="menu-btn" onclick="toggleSidebar()">&#9776;</button>
+    <span id="topbar-title">Chat</span>
+    <span id="toks-display"></span>
+    <span id="status-badge">initializing</span>
   </div>
-  <div id="progress-text">Loading model...</div>
+
+  <!-- Chat panel -->
+  <div class="panel active" id="panel-chat">
+    <div id="chat-messages">
+      <div id="progress-wrap">
+        <div id="progress-bar-outer"><div id="progress-bar-inner"></div></div>
+        <div id="progress-text"></div>
+      </div>
+    </div>
+    <div id="chat-input-wrap">
+      <div id="input-box">
+        <textarea id="user-input" placeholder="Ask anything..." rows="1" disabled
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}"></textarea>
+        <button id="send-btn" disabled onclick="sendMessage()">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search panel -->
+  <div class="panel" id="panel-search">
+    <div class="panel-placeholder">
+      <strong>Search</strong>
+      <span>Search your database — coming soon</span>
+    </div>
+  </div>
+
+  <!-- Entry panel -->
+  <div class="panel" id="panel-entry">
+    <div class="panel-placeholder">
+      <strong>Entry</strong>
+      <span>Save to your database — coming soon</span>
+    </div>
+  </div>
+
+  <!-- Database panel -->
+  <div class="panel" id="panel-database">
+    <div class="panel-placeholder">
+      <strong>Database</strong>
+      <span>Browse your entries — coming soon</span>
+    </div>
+  </div>
+
 </div>
 
-<div id="input-row">
-  <span id="prompt-sign">$</span>
-  <input id="user-input" type="text" placeholder="type your question..." autocomplete="off" disabled>
-  <button id="send-btn" disabled>SEND</button>
-</div>
+<!-- Watermark -->
+<div id="watermark">memexpaim-llm</div>
 
 <script type="module">
 import * as webllm from "https://esm.run/@mlc-ai/web-llm@0.2.79";
 
 const MODELS = [
-  "SmolLM2-360M-Instruct-q4f16_1-MLC",       // fast, small — needs shader-f16
-  "Qwen2.5-0.5B-Instruct-q4f32_1-MLC"        // fallback — broader GPU support
+  "SmolLM2-360M-Instruct-q4f16_1-MLC",
+  "Qwen2.5-0.5B-Instruct-q4f32_1-MLC"
 ];
-// /no_think disables Qwen3 chain-of-thought — answer comes instantly from DB context
-const SYSTEM_PROMPT = "You are a concise assistant. Answer in maximum 2-3 short sentences. Be direct and clear. No unnecessary explanations. /no_think";
+
+const SYSTEM_PROMPT = "You are a concise assistant. Answer in maximum 2-3 short sentences. Be direct. No unnecessary explanations. /no_think";
 
 let engine = null;
 let busy = false;
+let activeModel = '';
 
-const terminal  = document.getElementById('terminal');
-const input     = document.getElementById('user-input');
-const sendBtn   = document.getElementById('send-btn');
-const statusTxt = document.getElementById('status-text');
-const progWrap  = document.getElementById('progress-wrap');
-const progBar   = document.getElementById('progress-bar-inner');
-const progTxt   = document.getElementById('progress-text');
+const statusBadge  = document.getElementById('status-badge');
+const toksDisplay  = document.getElementById('toks-display');
+const progWrap     = document.getElementById('progress-wrap');
+const progBar      = document.getElementById('progress-bar-inner');
+const progText     = document.getElementById('progress-text');
+const chatMessages = document.getElementById('chat-messages');
+const input        = document.getElementById('user-input');
+const sendBtn      = document.getElementById('send-btn');
+const modelFooter  = document.getElementById('model-footer');
 
-function log(text, type = 'sys') {
-  const div = document.createElement('div');
-  div.className = `line ${type}`;
-  div.textContent = text;
-  terminal.appendChild(div);
-  terminal.scrollTop = terminal.scrollHeight;
-  return div;
+function setStatus(s) { statusBadge.textContent = s; }
+
+function addMsg(text, type) {
+  const wrap = document.createElement('div');
+  wrap.className = 'msg ' + type;
+  const label = document.createElement('div');
+  label.className = 'msg-label';
+  label.textContent = type === 'user' ? 'You' : 'Memex';
+  const body = document.createElement('div');
+  body.className = 'msg-body';
+  body.textContent = text;
+  wrap.appendChild(label);
+  wrap.appendChild(body);
+  chatMessages.appendChild(wrap);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+  return body;
 }
 
-function setStatus(text) { statusTxt.textContent = text; }
+function addDivider() {
+  const d = document.createElement('div');
+  d.className = 'msg-divider';
+  chatMessages.appendChild(d);
+}
+
+// auto-resize textarea
+input.addEventListener('input', () => {
+  input.style.height = 'auto';
+  input.style.height = input.scrollHeight + 'px';
+});
 
 async function initModel() {
-  log('MEMEX LLM v0.1 — SmolLM2-360M', 'sys');
-  log('WebGPU accelerated · offline capable', 'sys');
-  log('─────────────────────────────────────', 'sys');
-
   if (!navigator.gpu) {
-    log('ERROR: WebGPU not supported. Use Chrome 113+', 'err');
-    setStatus('WEBGPU NOT SUPPORTED');
+    setStatus('no webgpu');
+    addMsg('WebGPU not supported. Please use Chrome 113+', 'ai');
     return;
   }
 
-  log('WebGPU ✓', 'sys');
   progWrap.style.display = 'block';
+  setStatus('loading...');
 
   for (const modelId of MODELS) {
-    log('Trying: ' + modelId, 'info');
-    setStatus('LOADING...');
     progBar.style.width = '0%';
+    progText.textContent = 'Loading ' + modelId + '...';
 
     try {
       engine = await webllm.CreateMLCEngine(modelId, {
-        initProgressCallback: (progress) => {
-          const pct = Math.round((progress.progress || 0) * 100);
+        initProgressCallback: (p) => {
+          const pct = Math.round((p.progress || 0) * 100);
           progBar.style.width = pct + '%';
-          progTxt.textContent = progress.text || ('Loading... ' + pct + '%');
+          progText.textContent = p.text || ('Loading... ' + pct + '%');
         }
       });
 
+      activeModel = modelId;
+      const shortName = modelId.split('-Instruct')[0];
       progWrap.style.display = 'none';
-      log('Model loaded ✓ — ' + modelId, 'sys');
-      log('─────────────────────────────────────', 'sys');
-      log('Ready. Type your question below.', 'info');
-      setStatus('READY · ' + modelId);
+      setStatus('ready');
+      modelFooter.textContent = shortName;
       input.disabled = false;
       sendBtn.disabled = false;
       input.focus();
       return;
 
     } catch (e) {
-      log('Failed: ' + e.message.slice(0, 80) + '...', 'err');
-      log('Trying next model...', 'sys');
+      progText.textContent = 'Trying next model...';
     }
   }
 
   progWrap.style.display = 'none';
-  log('All models failed. Check browser WebGPU support.', 'err');
-  setStatus('ERROR');
+  setStatus('error');
+  addMsg('Failed to load model. Check browser WebGPU support.', 'ai');
 }
 
-async function sendMessage() {
+window.sendMessage = async function() {
   const text = input.value.trim();
   if (!text || busy || !engine) return;
 
   busy = true;
   input.value = '';
+  input.style.height = 'auto';
   input.disabled = true;
   sendBtn.disabled = true;
-  setStatus('THINKING...');
+  setStatus('thinking...');
+  toksDisplay.textContent = '';
 
-  log(text, 'user');
-
-  const aiLine = document.createElement('div');
-  aiLine.className = 'line ai';
-  const cursor = document.createElement('span');
-  cursor.className = 'cursor';
-  aiLine.appendChild(cursor);
-  terminal.appendChild(aiLine);
-  terminal.scrollTop = terminal.scrollHeight;
+  addMsg(text, 'user');
+  const aiBody = addMsg('', 'ai');
+  chatMessages.scrollTop = chatMessages.scrollHeight;
 
   try {
     const stream = await engine.chat.completions.create({
@@ -269,44 +483,52 @@ async function sendMessage() {
       ],
       stream: true,
       temperature: 0.7,
-      max_tokens: 128
+      max_tokens: 128,
+      frequency_penalty: 1.2
     });
 
     let response = '';
-    let tokenCount = 0;
-    const startTime = Date.now();
-    const toksDisplay = document.getElementById('toks-display');
-    toksDisplay.style.display = 'inline';
+    let tokens = 0;
+    const t0 = Date.now();
 
     for await (const chunk of stream) {
       const delta = chunk.choices[0]?.delta?.content || '';
-      if (delta) tokenCount++;
+      if (delta) tokens++;
       response += delta;
-      aiLine.textContent = response;
-      aiLine.appendChild(cursor);
-      terminal.scrollTop = terminal.scrollHeight;
-      const elapsed = (Date.now() - startTime) / 1000;
-      if (elapsed > 0) toksDisplay.textContent = Math.round(tokenCount / elapsed) + ' tok/s';
+      aiBody.textContent = response;
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+      const sec = (Date.now() - t0) / 1000;
+      if (sec > 0) toksDisplay.textContent = Math.round(tokens / sec) + ' tok/s';
     }
-    cursor.remove();
-    const totalSec = ((Date.now() - startTime) / 1000).toFixed(1);
-    toksDisplay.textContent = Math.round(tokenCount / (totalSec || 1)) + ' tok/s · ' + totalSec + 's';
-    log('─────────────────────────────────────', 'sys');
+
+    const totalSec = ((Date.now() - t0) / 1000).toFixed(1);
+    toksDisplay.textContent = Math.round(tokens / (totalSec || 1)) + ' tok/s · ' + totalSec + 's';
+    addDivider();
 
   } catch (e) {
-    cursor.remove();
-    log('ERROR: ' + e.message, 'err');
+    aiBody.textContent = 'Error: ' + e.message;
   }
 
   busy = false;
   input.disabled = false;
   sendBtn.disabled = false;
-  setStatus('READY · ' + MODEL_ID);
+  setStatus('ready');
   input.focus();
-}
+};
 
-sendBtn.addEventListener('click', sendMessage);
-input.addEventListener('keydown', e => { if (e.key === 'Enter') sendMessage(); });
+window.showPanel = function(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  event.target.classList.add('active');
+  document.getElementById('topbar-title').textContent =
+    name.charAt(0).toUpperCase() + name.slice(1);
+  if (window.innerWidth <= 600) document.getElementById('sidebar').classList.add('hidden');
+};
+
+window.toggleSidebar = function() {
+  document.getElementById('sidebar').classList.toggle('hidden');
+};
 
 initModel();
 </script>
