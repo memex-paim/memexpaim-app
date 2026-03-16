@@ -99,13 +99,14 @@
     background: none;
     border: none;
     cursor: pointer;
-    color: var(--text2);
-    font-size: 18px;
+    color: var(--text3);
+    font-size: 15px;
     padding: 2px 4px;
     line-height: 1;
+    transition: color 0.15s;
   }
 
-  #menu-btn:hover { color: var(--text); }
+  #menu-btn:hover { color: var(--text2); }
 
   #topbar-title {
     font-size: 14px;
@@ -116,10 +117,6 @@
   #status-badge {
     font-size: 11px;
     color: var(--text3);
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 2px 10px;
   }
 
   #toks-display {
@@ -214,14 +211,13 @@
     display: flex;
     align-items: flex-end;
     border: 1px solid var(--input-border);
-    border-radius: 12px;
+    border-radius: 8px;
     background: var(--bg3);
     padding: 10px 14px;
-    gap: 10px;
-    box-shadow: none;
+    gap: 8px;
   }
 
-  #input-box:focus-within { border-color: #333333; }
+  #input-box:focus-within { border-color: #303030; }
 
   #user-input { background: transparent; }
 
@@ -242,21 +238,19 @@
   #user-input::placeholder { color: var(--text3); }
 
   #send-btn {
-    background: var(--accent);
+    background: none;
     border: none;
-    border-radius: 8px;
-    color: white;
+    color: var(--text3);
     font-family: inherit;
     font-size: 13px;
-    font-weight: 500;
-    padding: 6px 14px;
+    padding: 4px 8px;
     cursor: pointer;
     flex-shrink: 0;
-    transition: background 0.1s;
+    transition: color 0.15s;
   }
 
-  #send-btn:hover { background: #1d4ed8; }
-  #send-btn:disabled { background: var(--bg3); color: var(--text3); cursor: not-allowed; }
+  #send-btn:hover { color: var(--text); }
+  #send-btn:disabled { color: var(--text3); opacity: 0.4; cursor: not-allowed; }
 
   /* ── Placeholder panels ── */
   .panel-placeholder {
