@@ -85,6 +85,15 @@ header h1{font-size:0.95rem;color:var(--accent);white-space:nowrap;}
 .acc-body{overflow:hidden;transition:max-height 0.25s ease,opacity 0.2s;max-height:900px;opacity:1;}
 .acc-body.closed{max-height:0;opacity:0;}
 .acc-inner{display:flex;flex-direction:column;gap:6px;padding:4px 0 6px 0;}
+.chat-sess-list{display:flex;flex-direction:column;gap:1px;max-height:220px;overflow-y:auto;}
+.chat-sess-item{display:flex;align-items:center;gap:2px;padding:4px 6px;border-radius:6px;cursor:pointer;border-left:2px solid transparent;}
+.chat-sess-item:hover{background:var(--bg2);}
+.chat-sess-item.active{background:var(--bg2);border-left-color:var(--accent);}
+.chat-sess-name{flex:1;font-size:0.74rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+.chat-sess-name-input{flex:1;font-size:0.74rem;background:var(--bg2);border:1px solid var(--accent);border-radius:3px;color:var(--text);padding:1px 4px;outline:none;min-width:0;}
+.chat-sess-btn{background:none;border:none;color:var(--text2);cursor:pointer;font-size:0.7rem;padding:0 2px;opacity:0.5;flex-shrink:0;line-height:1;}
+.chat-sess-btn:hover{opacity:1;color:var(--accent);}
+.chat-sess-del:hover{color:var(--red) !important;}
 .section-title{font-size:0.63rem;color:var(--text2);text-transform:uppercase;letter-spacing:1px;}
 label{font-size:0.76rem;color:var(--text2);display:block;margin-bottom:2px;}
 input,select,textarea{width:100%;background:var(--bg0);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:4px;font-family:monospace;font-size:0.78rem;outline:none;transition:border 0.15s;}
@@ -394,6 +403,22 @@ input[type=file]#imp-fajl{display:none;}
     </div>
   </div>
 
+  <hr class="divider">
+
+  <!-- CHAT SESSIONS -->
+  <div class="acc">
+    <div class="acc-hdr" onclick="accToggle('chat-sess')">
+      <span class="section-title" id="s-chat-sess">💬 Chat</span>
+      <span class="acc-arrow open" id="arr-chat-sess">▶</span>
+    </div>
+    <div class="acc-body" id="acc-chat-sess">
+      <div class="acc-inner">
+        <button class="btn btn-green" style="width:100%;font-size:0.75rem;" onclick="ujChatSession()" id="btn-new-chat">+ New Chat</button>
+        <div class="chat-sess-list" id="chat-sess-list"></div>
+      </div>
+    </div>
+  </div>
+
 </div><!-- /sidebar -->
 
 <div class="main">
@@ -563,7 +588,8 @@ input[type=file]#imp-fajl{display:none;}
 import {
   dbInit, uuidGet, bejegyez, keres, legutobbi, legfontosabb,
   statisztika, horgonyLista, horgonyListaOsszes, torol, ujAdatbazis as dbUjAdatbazis,
-  exportMemex, importMemex, systemPromptBuild
+  exportMemex, importMemex, systemPromptBuild,
+  sessionLetrehoz, sessionAtnevez, sessionTorol, sessionLista, sessionUzenetek
 } from './memex-db.js';
 
 // ── Globális állapot ───────────────────────────────────────────────────────────
@@ -1724,6 +1750,108 @@ async function claudeHivas(uzenet, rendszer, kulcs, modell) {
   return d.content?.[0]?.text || '[Üres válasz]';
 }
 
+// ── Chat Sessions ─────────────────────────────────────────────────────────────
+
+let aktivSessionId = null;
+
+async function sessionListaFrissit() {
+  const lista = await sessionLista();
+  const el = document.getElementById('chat-sess-list');
+  el.innerHTML = '';
+  for (const sess of lista) {
+    const item = document.createElement('div');
+    item.className = 'chat-sess-item' + (sess.id === aktivSessionId ? ' active' : '');
+    item.dataset.sessId = sess.id;
+
+    const name = document.createElement('span');
+    name.className = 'chat-sess-name';
+    name.textContent = sess.nev;
+    name.title = sess.nev;
+    name.onclick = () => chatSessionValt(sess.id);
+
+    const editBtn = document.createElement('button');
+    editBtn.className = 'chat-sess-btn';
+    editBtn.textContent = '✏';
+    editBtn.title = 'Rename';
+    editBtn.onclick = (e) => { e.stopPropagation(); chatSessionAtnevezUI(sess.id, item); };
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'chat-sess-btn chat-sess-del';
+    delBtn.textContent = '×';
+    delBtn.title = 'Delete';
+    delBtn.onclick = (e) => { e.stopPropagation(); chatSessionTorlesSess(sess.id); };
+
+    item.appendChild(name);
+    item.appendChild(editBtn);
+    item.appendChild(delBtn);
+    el.appendChild(item);
+  }
+}
+
+window.ujChatSession = async function() {
+  const id = await sessionLetrehoz('New Chat');
+  aktivSessionId = id;
+  localStorage.setItem('mx_sess_id', id);
+  const area = document.getElementById('chat-area');
+  area.innerHTML = '';
+  const wb = document.getElementById('welcome-msg');
+  if (wb) wb.textContent = tr('welcome');
+  await sessionListaFrissit();
+};
+
+async function chatSessionValt(id) {
+  aktivSessionId = id;
+  localStorage.setItem('mx_sess_id', id);
+  const area = document.getElementById('chat-area');
+  area.innerHTML = '';
+  const uzenetek = await sessionUzenetek(id);
+  for (const u of uzenetek) {
+    const szerep = u.iro === 'human' ? 'human' : 'ai';
+    const szoveg = u.tartalom.startsWith('K: ') ? u.tartalom.slice(3)
+                 : u.tartalom.startsWith('V: ') ? u.tartalom.slice(3)
+                 : u.tartalom;
+    chatUzenet(szoveg, szerep, null);
+  }
+  await sessionListaFrissit();
+}
+
+async function chatSessionTorlesSess(id) {
+  await sessionTorol(id);
+  if (aktivSessionId === id) {
+    localStorage.removeItem('mx_sess_id');
+    aktivSessionId = null;
+    const lista = await sessionLista();
+    if (lista.length > 0) {
+      await chatSessionValt(lista[0].id);
+    } else {
+      await window.ujChatSession();
+    }
+  } else {
+    await sessionListaFrissit();
+  }
+}
+
+function chatSessionAtnevezUI(id, item) {
+  const nameEl = item.querySelector('.chat-sess-name');
+  const huNev = nameEl.textContent;
+  const input = document.createElement('input');
+  input.className = 'chat-sess-name-input';
+  input.value = huNev;
+  nameEl.replaceWith(input);
+  input.focus();
+  input.select();
+  const ment = async () => {
+    const ujNev = input.value.trim() || huNev;
+    await sessionAtnevez(id, ujNev);
+    await sessionListaFrissit();
+  };
+  input.onblur = ment;
+  input.onkeydown = e => {
+    if (e.key === 'Enter') input.blur();
+    if (e.key === 'Escape') { input.value = huNev; input.blur(); }
+  };
+}
+
 // ── Chat ──────────────────────────────────────────────────────────────────────
 
 window.kuld = async function() {
@@ -1800,14 +1928,23 @@ window.kuld = async function() {
       const autoFont = parseInt(document.getElementById('auto-fontossag').value) || 4;
       const voiceH = _voiceFlag ? ['voice'] : [];
       _voiceFlag = false;
-      await bejegyez({ tartalom: 'K: ' + kerdes, horgonyok: ['chat',...voiceH,...sessionH], fontossag: autoFont, iro: 'human' });
+      await bejegyez({ tartalom: 'K: ' + kerdes, horgonyok: ['chat',...voiceH,...sessionH], fontossag: autoFont, iro: 'human', session_id: aktivSessionId });
       if (aiValasz) {
         if (szavakSzama(aiValasz) > 500) {
           const chunks = szovegDarabol(aiValasz);
           for (const chunk of chunks)
-            await bejegyez({ tartalom: 'V: ' + chunk, horgonyok: ['chat',...sessionH], fontossag: autoFont, iro: 'ai' });
+            await bejegyez({ tartalom: 'V: ' + chunk, horgonyok: ['chat',...sessionH], fontossag: autoFont, iro: 'ai', session_id: aktivSessionId });
         } else {
-          await bejegyez({ tartalom: 'V: ' + aiValasz, horgonyok: ['chat',...sessionH], fontossag: autoFont, iro: 'ai' });
+          await bejegyez({ tartalom: 'V: ' + aiValasz, horgonyok: ['chat',...sessionH], fontossag: autoFont, iro: 'ai', session_id: aktivSessionId });
+        }
+      }
+      // Auto-rename: ha az első üzenet és a session neve még "New Chat"
+      if (aktivSessionId) {
+        const lista = await sessionLista();
+        const aktSess = lista.find(s => s.id === aktivSessionId);
+        if (aktSess && aktSess.nev === 'New Chat') {
+          await sessionAtnevez(aktivSessionId, kerdes.slice(0, 35));
+          await sessionListaFrissit();
         }
       }
       await statFrissit();
@@ -2318,6 +2455,17 @@ window.uuidMutat = function() {
     txt.textContent = ' Kész · ' + (t === 'offline' || !k ? 'Offline mód' : t);
     await window.statFrissit();
     window.apiValtozas();
+    // Session inicializálás
+    const sessLista = await sessionLista();
+    const mentettSessId = parseInt(localStorage.getItem('mx_sess_id'));
+    const talaltt = sessLista.find(s => s.id === mentettSessId);
+    if (talaltt) {
+      await chatSessionValt(talaltt.id);
+    } else if (sessLista.length > 0) {
+      await chatSessionValt(sessLista[0].id);
+    } else {
+      await window.ujChatSession();
+    }
   } catch(e) {
     dot.className = 'dot-err';
     txt.textContent = ' DB hiba: ' + e.message;

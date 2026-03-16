@@ -4,7 +4,7 @@
  */
 
 const DB_NAME = 'memex';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 let idb = null;
 
 // ── Inicializálás ─────────────────────────────────────────────────────────────
@@ -26,6 +26,10 @@ export function dbInit() {
       }
       if (!db.objectStoreNames.contains('horgony_stat')) {
         db.createObjectStore('horgony_stat', { keyPath: 'horgony' });
+      }
+      if (!db.objectStoreNames.contains('sessions')) {
+        const sess = db.createObjectStore('sessions', { keyPath: 'id', autoIncrement: true });
+        sess.createIndex('letrehozva', 'letrehozva');
       }
     };
     req.onsuccess = e => { idb = e.target.result; resolve(idb); };
@@ -69,6 +73,15 @@ function idbAdd(store, obj) {
     const t = tx(store, 'readwrite');
     const r = t.objectStore(store).add(obj);
     r.onsuccess = () => res(r.result);
+    r.onerror   = () => rej(r.error);
+  });
+}
+
+function idbDelete(store, key) {
+  return new Promise((res, rej) => {
+    const t = tx(store, 'readwrite');
+    const r = t.objectStore(store).delete(key);
+    r.onsuccess = () => res();
     r.onerror   = () => rej(r.error);
   });
 }
@@ -122,7 +135,7 @@ export function tipusFeliismer(tartalom) {
 
 // ── CRUD ──────────────────────────────────────────────────────────────────────
 
-export async function bejegyez({ tartalom, horgonyok = [], fontossag = 3, tipus = '', iro = 'human' }) {
+export async function bejegyez({ tartalom, horgonyok = [], fontossag = 3, tipus = '', iro = 'human', session_id = null }) {
   const idobelyeg = new Date().toISOString();
   const h = autoHorgony(tartalom, horgonyok);
   const t = tipus || tipusFeliismer(tartalom);
@@ -131,7 +144,8 @@ export async function bejegyez({ tartalom, horgonyok = [], fontossag = 3, tipus 
     horgonyok: JSON.stringify(h),
     tipus: t, fontossag, iro,
     hash: idobelyeg + tartalom,
-    torolve: 0
+    torolve: 0,
+    session_id
   });
   // horgony statisztika
   for (const h_ of h) {
@@ -216,12 +230,41 @@ export async function nevjegyGet() {
 
 export async function ujAdatbazis() {
   await new Promise((res, rej) => {
-    const t = idb.transaction(['naplo', 'horgony_stat'], 'readwrite');
+    const t = idb.transaction(['naplo', 'horgony_stat', 'sessions'], 'readwrite');
     t.objectStore('naplo').clear();
     t.objectStore('horgony_stat').clear();
+    t.objectStore('sessions').clear();
     t.oncomplete = res;
     t.onerror = () => rej(t.error);
   });
+}
+
+// ── Session CRUD ──────────────────────────────────────────────────────────────
+
+export async function sessionLetrehoz(nev = 'New Chat') {
+  const letrehozva = new Date().toISOString();
+  return await idbAdd('sessions', { nev, letrehozva, frissitve: letrehozva });
+}
+
+export async function sessionAtnevez(id, nev) {
+  const sess = await idbGet('sessions', id);
+  if (sess) { sess.nev = nev; sess.frissitve = new Date().toISOString(); await idbPut('sessions', sess); }
+}
+
+export async function sessionTorol(id) {
+  await idbDelete('sessions', id);
+}
+
+export async function sessionLista() {
+  const ossz = await idbGetAll('sessions');
+  return ossz.sort((a, b) => b.id - a.id);
+}
+
+export async function sessionUzenetek(sessionId) {
+  const mindenki = await idbGetAll('naplo');
+  return mindenki
+    .filter(r => r.torolve === 0 && r.session_id === sessionId)
+    .sort((a, b) => a.sorszam - b.sorszam);
 }
 
 // ── System prompt az AI-nak ───────────────────────────────────────────────────
