@@ -163,7 +163,7 @@
 <script type="module">
 import * as webllm from "https://esm.run/@mlc-ai/web-llm@0.2.79";
 
-const MODEL_ID = "Qwen3-0.6B-q4f32_1-MLC";
+const MODEL_ID = "SmolLM2-360M-Instruct-q4f16_1-MLC";
 // /no_think disables Qwen3 chain-of-thought — answer comes instantly from DB context
 const SYSTEM_PROMPT = "You are a concise assistant. Answer in maximum 2-3 short sentences. Be direct and clear. No unnecessary explanations. /no_think";
 
@@ -190,7 +190,7 @@ function log(text, type = 'sys') {
 function setStatus(text) { statusTxt.textContent = text; }
 
 async function initModel() {
-  log('MEMEX LLM v0.1 — Qwen3-0.6B', 'sys');
+  log('MEMEX LLM v0.1 — SmolLM2-360M', 'sys');
   log('WebGPU accelerated · offline capable', 'sys');
   log('─────────────────────────────────────', 'sys');
 
@@ -202,7 +202,7 @@ async function initModel() {
 
   log('WebGPU ✓', 'sys');
   log('Loading model: ' + MODEL_ID, 'info');
-  log('First run: ~1.4GB download. Next runs: instant.', 'sys');
+  log('First run: ~376MB download. Next runs: instant.', 'sys');
 
   progWrap.style.display = 'block';
   setStatus('LOADING MODEL...');
