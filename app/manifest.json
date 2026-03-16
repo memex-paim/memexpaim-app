@@ -4,11 +4,15 @@
   "short_name": "Memex",
   "description": "Personal AI memory – offline, your data stays yours",
   "start_url": "./index.html",
+  "scope": "/app/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "background_color": "#0d1117",
   "theme_color": "#161b22",
   "orientation": "portrait",
   "lang": "en",
+  "dir": "ltr",
+  "iarc_rating_id": "",
   "icons": [
     {
       "src": "./icon.svg",
