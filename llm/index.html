@@ -139,7 +139,10 @@
 
 <div id="header">
   <span class="title">MEMEX LLM</span>
-  <span class="status" id="status-text">INITIALIZING...</span>
+  <span class="status">
+    <span id="status-text">INITIALIZING...</span>
+    <span id="toks-display" style="margin-left:10px;color:#00ff4155;display:none;">0 tok/s</span>
+  </span>
 </div>
 
 <div id="terminal"></div>
@@ -261,14 +264,24 @@ async function sendMessage() {
     });
 
     let response = '';
+    let tokenCount = 0;
+    const startTime = Date.now();
+    const toksDisplay = document.getElementById('toks-display');
+    toksDisplay.style.display = 'inline';
+
     for await (const chunk of stream) {
       const delta = chunk.choices[0]?.delta?.content || '';
+      if (delta) tokenCount++;
       response += delta;
       aiLine.textContent = response;
       aiLine.appendChild(cursor);
       terminal.scrollTop = terminal.scrollHeight;
+      const elapsed = (Date.now() - startTime) / 1000;
+      if (elapsed > 0) toksDisplay.textContent = Math.round(tokenCount / elapsed) + ' tok/s';
     }
     cursor.remove();
+    const totalSec = ((Date.now() - startTime) / 1000).toFixed(1);
+    toksDisplay.textContent = Math.round(tokenCount / (totalSec || 1)) + ' tok/s · ' + totalSec + 's';
     log('─────────────────────────────────────', 'sys');
 
   } catch (e) {
