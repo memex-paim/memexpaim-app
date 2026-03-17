@@ -198,6 +198,28 @@ if ('serviceWorker' in navigator) {
     border-top: 1px solid var(--border);
   }
 
+  .source-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+  }
+
+  .source-chip {
+    font-size: 11px;
+    color: var(--text3);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 3px 8px;
+    cursor: pointer;
+    background: none;
+    font-family: inherit;
+    transition: color 0.15s, border-color 0.15s;
+    text-align: left;
+  }
+  .source-chip:hover { color: var(--text2); border-color: #404040; }
+  .source-chip:disabled { opacity: 0.5; cursor: default; }
+
   /* progress */
   #progress-wrap {
     max-width: 680px;
@@ -639,6 +661,8 @@ if ('serviceWorker' in navigator) {
 <!-- Watermark -->
 <div id="watermark">memexpaim-llm</div>
 
+<script src="https://cdn.jsdelivr.net/npm/@mozilla/readability@0.5.0/Readability.js"></script>
+
 <script type="module">
 import * as webllm from "https://esm.run/@mlc-ai/web-llm@0.2.79";
 import { dbInit, keres, bejegyez, legutobbi, statisztika, torol, exportMemex, importMemex, ujAdatbazis } from "./memex-db.js";
@@ -812,14 +836,29 @@ window.sendMessage = async function() {
   try {
     // RAG: keresés az adatbázisban (csak ha DB toggle BE van kapcsolva)
     let systemPrompt = buildSystemPrompt();
+    const rssArticles = [];
     if (dbReady) {
       const talalatok = await keres(text, 5);
       if (talalatok.length > 0) {
         systemPrompt += '\n\n=== YOUR MEMORY DATABASE ===\n';
         talalatok.forEach(r => {
           systemPrompt += `[${(r.idobelyeg||'').slice(0,10)}] ${r.tartalom.slice(0,200)}\n`;
+          if (r.iro === 'rss') {
+            const urlMatch = r.tartalom.match(/\nURL: (.+)$/m);
+            const titleMatch = r.tartalom.match(/^[^\n]+?: (.+)$/m);
+            if (urlMatch) rssArticles.push({
+              url: urlMatch[1].trim(),
+              title: (titleMatch ? titleMatch[1].trim() : 'Article').slice(0, 60),
+              cat: (() => { try { return JSON.parse(r.horgonyok)[0] || ''; } catch { return ''; } })()
+            });
+          }
         });
       }
+    }
+    // Inject pending article (from "Ask Qwen" button)
+    if (pendingArticle) {
+      systemPrompt += '\n\n=== ARTICLE TO ANALYZE ===\n' + pendingArticle.slice(0, 3000);
+      pendingArticle = null;
     }
 
     // Sliding window: trim history to fit context
@@ -861,6 +900,10 @@ window.sendMessage = async function() {
 
     const totalSec = ((Date.now() - t0) / 1000).toFixed(1);
     toksDisplay.textContent = Math.round(tokens / (totalSec || 1)) + ' tok/s · ' + totalSec + 's';
+
+    // Show source buttons for RSS articles used in RAG
+    if (rssArticles.length > 0) addSourceButtons(rssArticles, aiBody.parentElement);
+
     addDivider();
 
   } catch (e) {
@@ -1087,6 +1130,102 @@ window.toggleSidebar = function() {
 
 // ── RSS ───────────────────────────────────────────────────────────────────────
 
+// ── Readability / Article fetch ───────────────────────────────────────────────
+
+function addSourceButtons(articles, msgWrap) {
+  const row = document.createElement('div');
+  row.className = 'source-chips';
+  articles.slice(0, 5).forEach(a => {
+    const btn = document.createElement('button');
+    btn.className = 'source-chip';
+    btn.textContent = '↗ ' + a.title;
+    btn.title = a.url;
+    btn.onclick = () => readArticle(a.url, a.title, a.cat, btn);
+    row.appendChild(btn);
+  });
+  msgWrap.appendChild(row);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+async function fetchArticle(url) {
+  const proxy = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
+  const res = await fetch(proxy, { signal: AbortSignal.timeout(15000) });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const html = await res.text();
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const base = doc.createElement('base');
+  base.href = url;
+  doc.head.prepend(base);
+  const reader = new Readability(doc);
+  const article = reader.parse();
+  if (!article) throw new Error('Could not extract article text');
+  const text = article.textContent.replace(/\s+/g, ' ').trim();
+  return { title: article.title || 'Article', text };
+}
+
+async function readArticle(url, title, cat, triggerBtn) {
+  if (triggerBtn) { triggerBtn.disabled = true; triggerBtn.textContent = '⏳ ' + title; }
+
+  const wrap = document.createElement('div');
+  wrap.className = 'msg ai';
+  const label = document.createElement('div');
+  label.className = 'msg-label';
+  label.textContent = 'Memex';
+  const body = document.createElement('div');
+  body.className = 'msg-body';
+  body.style.color = 'var(--text3)';
+  body.textContent = 'Reading article…';
+  wrap.appendChild(label);
+  wrap.appendChild(body);
+  chatMessages.appendChild(wrap);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+
+  try {
+    const { title: artTitle, text } = await fetchArticle(url);
+    body.style.color = '';
+    body.textContent = '"' + artTitle + '"\n\n' + text.slice(0, 500) + '…';
+
+    const actions = document.createElement('div');
+    actions.className = 'source-chips';
+    actions.style.marginTop = '10px';
+
+    const askBtn = document.createElement('button');
+    askBtn.className = 'source-chip';
+    askBtn.textContent = 'Ask Qwen';
+    askBtn.onclick = () => askQwenArticle(artTitle, text, actions);
+
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'source-chip';
+    saveBtn.textContent = 'Save to DB';
+    saveBtn.onclick = async () => {
+      await bejegyez({ tartalom: artTitle + '\n\n' + text.slice(0, 3000) + '\nURL: ' + url, iro: 'article', horgonyok: cat ? [cat] : [], fontossag: 3 });
+      saveBtn.textContent = 'Saved ✓';
+      saveBtn.disabled = true;
+    };
+
+    actions.appendChild(askBtn);
+    actions.appendChild(saveBtn);
+    wrap.appendChild(actions);
+
+    if (triggerBtn) { triggerBtn.textContent = '✓ ' + title; }
+  } catch (e) {
+    body.textContent = 'Could not read article: ' + e.message;
+    if (triggerBtn) { triggerBtn.disabled = false; triggerBtn.textContent = '↗ ' + title; }
+  }
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+async function askQwenArticle(artTitle, text, actionsEl) {
+  if (!engine || busy) return;
+  actionsEl.style.display = 'none';
+  pendingArticle = '"' + artTitle + '"\n\n' + text;
+  input.value = 'Summarize this article for me.';
+  input.dispatchEvent(new Event('input'));
+  await sendMessage();
+}
+
+// ── RSS feeds ─────────────────────────────────────────────────────────────────
+
 const RSS_FEEDS = [
   // World News
   {url:'http://feeds.bbci.co.uk/news/rss.xml',name:'BBC News',cat:'World'},
@@ -1226,6 +1365,7 @@ async function cleanRssDB() {
 }
 
 let rssSyncing = false;
+let pendingArticle = null; // article text injected into next Qwen context
 
 window.syncRSS = async function() {
   if (rssSyncing || !dbReady) return;
