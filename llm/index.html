@@ -353,6 +353,16 @@ if ('serviceWorker' in navigator) {
   }
   #update-badge:hover { background: rgba(240,165,0,0.1); }
 
+  #ctx-badge {
+    display: none;
+    font-size: 11px;
+    color: var(--text3);
+    border: 1px solid var(--text3);
+    border-radius: 8px;
+    padding: 1px 7px;
+    cursor: default;
+  }
+
   /* ── Mobile ── */
   @media (max-width: 600px) {
     :root { --sidebar-w: 200px; }
@@ -392,6 +402,7 @@ if ('serviceWorker' in navigator) {
     <button id="menu-btn" onclick="toggleSidebar()">&#9776;</button>
     <span id="topbar-title">Chat</span>
     <span id="update-badge" onclick="location.reload()">update ↻</span>
+    <span id="ctx-badge" title="Context window full — oldest messages forgotten"></span>
     <span id="toks-display"></span>
     <span id="status-badge">initializing</span>
   </div>
@@ -478,9 +489,41 @@ window.dbToggle = function() {
   el.classList.toggle('on', dbOn);
 };
 
+const MAX_TOKENS = 4096;
+const HISTORY_LIMIT = Math.floor(MAX_TOKENS * 0.75); // 75% = ~3072 token history-ra
+
 let engine = null;
 let busy = false;
 let activeModel = '';
+let history = []; // [{role, content, tokens}]
+
+// Durva becslés: ~1 token = 4 karakter
+function estTokens(text) { return Math.ceil(text.length / 4); }
+
+const ctxBadge = document.getElementById('ctx-badge');
+
+function trimHistory(reservedTokens) {
+  const available = HISTORY_LIMIT - reservedTokens;
+  let total = 0;
+  const keep = [];
+  for (let i = history.length - 1; i >= 0; i--) {
+    total += history[i].tokens;
+    if (total > available) break;
+    keep.unshift(history[i]);
+  }
+  if (keep.length < history.length) {
+    const dropped = history.length - keep.length;
+    ctxBadge.textContent = `↺ ${dropped} forgotten`;
+    ctxBadge.style.display = 'inline';
+  }
+  return keep;
+}
+
+function contextPct(systemPrompt) {
+  const sysT = estTokens(systemPrompt);
+  const histT = history.reduce((s, h) => s + h.tokens, 0);
+  return Math.round(((sysT + histT) / MAX_TOKENS) * 100);
+}
 
 const statusBadge  = document.getElementById('status-badge');
 const toksDisplay  = document.getElementById('toks-display');
@@ -595,11 +638,18 @@ window.sendMessage = async function() {
       }
     }
 
+    // Sliding window: trim history to fit context
+    const sysTokens = estTokens(systemPrompt);
+    const trimmedHistory = trimHistory(sysTokens);
+
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      ...trimmedHistory.map(h => ({ role: h.role, content: h.content })),
+      { role: 'user', content: text }
+    ];
+
     const stream = await engine.chat.completions.create({
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: text }
-      ],
+      messages,
       stream: true,
       temperature: 0.7,
       max_tokens: 128,
@@ -619,6 +669,10 @@ window.sendMessage = async function() {
       const sec = (Date.now() - t0) / 1000;
       if (sec > 0) toksDisplay.textContent = Math.round(tokens / sec) + ' tok/s';
     }
+
+    // Save exchange to history
+    history.push({ role: 'user', content: text, tokens: estTokens(text) });
+    history.push({ role: 'assistant', content: response, tokens: tokens || estTokens(response) });
 
     const totalSec = ((Date.now() - t0) / 1000).toFixed(1);
     toksDisplay.textContent = Math.round(tokens / (totalSec || 1)) + ' tok/s · ' + totalSec + 's';
