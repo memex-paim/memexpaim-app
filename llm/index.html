@@ -400,6 +400,30 @@ if ('serviceWorker' in navigator) {
     padding: 4px 8px;
   }
 
+  /* priority buttons */
+  .prio-row { display: flex; gap: 4px; }
+  .prio-btn {
+    flex: 1; padding: 6px 4px;
+    border: 1px solid var(--text3);
+    background: none; color: var(--text3);
+    font-size: 12px; cursor: pointer;
+    border-radius: 4px; font-family: inherit;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .prio-btn:hover { color: var(--text2); border-color: var(--text2); }
+  .prio-btn.sel { color: var(--text); border-color: var(--text2); }
+
+  /* db row delete */
+  .db-row-del {
+    font-size: 12px; color: var(--text3);
+    background: none; border: none; cursor: pointer;
+    padding: 2px 6px; flex-shrink: 0;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .db-row:hover .db-row-del { opacity: 1; }
+  .db-row-del:hover { color: var(--text2); }
+
   /* ── Watermark ── */
   #watermark {
     position: fixed;
@@ -506,14 +530,31 @@ if ('serviceWorker' in navigator) {
 
   <!-- Entry panel -->
   <div class="panel" id="panel-entry">
-    <div class="panel-input-wrap">
-      <div class="panel-input-box">
-        <textarea id="entry-input" placeholder="Save to memory..." rows="4"
-          style="max-height:200px;"></textarea>
-        <button class="panel-btn" id="entry-btn" onclick="saveEntry()">Save</button>
+    <div class="panel-content" style="padding-bottom:0;">
+      <div class="panel-row">
+        <div class="panel-input-box" style="align-items:flex-start;">
+          <textarea id="entry-input" placeholder="Save to memory..." rows="5"
+            style="max-height:240px;line-height:1.5;"></textarea>
+        </div>
+      </div>
+      <div class="panel-row" style="margin-bottom:8px;">
+        <div class="panel-input-box">
+          <input type="text" id="entry-anchors" placeholder="anchors (optional, space separated)" />
+        </div>
+      </div>
+      <div class="panel-row" style="margin-bottom:8px;">
+        <div class="prio-row" id="prio-row">
+          <button class="prio-btn" data-p="1" onclick="prioSet(1)">Critical</button>
+          <button class="prio-btn" data-p="2" onclick="prioSet(2)">Important</button>
+          <button class="prio-btn sel" data-p="3" onclick="prioSet(3)">Normal</button>
+          <button class="prio-btn" data-p="4" onclick="prioSet(4)">Casual</button>
+        </div>
+      </div>
+      <div class="panel-row" style="display:flex;align-items:center;gap:12px;margin-bottom:0;">
+        <button class="panel-btn" style="padding:6px 16px;border:1px solid var(--text3);border-radius:6px;color:var(--text2);" onclick="saveEntry()">Save</button>
+        <span class="flash" id="entry-flash"></span>
       </div>
     </div>
-    <div class="panel-row"><span class="flash" id="entry-flash"></span></div>
   </div>
 
   <!-- Database panel -->
@@ -528,7 +569,7 @@ if ('serviceWorker' in navigator) {
 
 <script type="module">
 import * as webllm from "https://esm.run/@mlc-ai/web-llm@0.2.79";
-import { dbInit, keres, bejegyez, legutobbi, statisztika } from "./memex-db.js";
+import { dbInit, keres, bejegyez, legutobbi, statisztika, torol } from "./memex-db.js";
 
 const MODELS = {
   "Qwen2.5-0.5B-Instruct-q4f32_1-MLC": "Qwen2.5 0.5B",
@@ -776,6 +817,8 @@ window.searchDebounce = function() {
   searchTimer = setTimeout(runSearch, 300);
 };
 
+const PRIO_LABEL = { 1: 'critical', 2: 'important', 3: 'normal', 4: 'casual' };
+
 async function runSearch() {
   const q = document.getElementById('search-input').value.trim();
   const out = document.getElementById('search-results');
@@ -786,29 +829,32 @@ async function runSearch() {
     out.innerHTML = '<div class="panel-row" style="color:var(--text3);font-size:13px;">No results</div>';
     return;
   }
-  hits.forEach(r => {
-    const row = document.createElement('div');
-    row.className = 'panel-row db-row';
-    row.innerHTML =
-      `<span class="db-row-date">${(r.idobelyeg||'').slice(0,10)}</span>` +
-      `<span class="db-row-text">${r.tartalom.slice(0,300)}</span>`;
-    out.appendChild(row);
-    const div = document.createElement('div');
-    div.className = 'panel-divider';
-    out.appendChild(div);
-  });
+  hits.forEach(r => renderDbRow(r, out, false));
 }
 
 // ── Entry ─────────────────────────────────────────────────────────────────────
+let entryPrio = 3;
+
+window.prioSet = function(p) {
+  entryPrio = p;
+  document.querySelectorAll('.prio-btn').forEach(b => {
+    b.classList.toggle('sel', parseInt(b.dataset.p) === p);
+  });
+};
+
 window.saveEntry = async function() {
   const ta = document.getElementById('entry-input');
   const text = ta.value.trim();
   if (!text || !dbReady) return;
+  const anchorsRaw = document.getElementById('entry-anchors').value.trim();
+  const horgonyok = anchorsRaw ? anchorsRaw.split(/\s+/).filter(Boolean) : [];
   const flash = document.getElementById('entry-flash');
   try {
-    await bejegyez({ tartalom: text, iro: 'human', fontossag: 3 });
+    await bejegyez({ tartalom: text, horgonyok, iro: 'human', fontossag: entryPrio });
     ta.value = '';
     ta.style.height = 'auto';
+    document.getElementById('entry-anchors').value = '';
+    prioSet(3);
     flash.textContent = 'saved';
     setTimeout(() => { flash.textContent = ''; }, 2000);
   } catch (e) {
@@ -816,7 +862,6 @@ window.saveEntry = async function() {
   }
 };
 
-// entry textarea auto-resize + Enter to save
 document.getElementById('entry-input').addEventListener('input', function() {
   this.style.height = 'auto';
   this.style.height = this.scrollHeight + 'px';
@@ -826,6 +871,28 @@ document.getElementById('entry-input').addEventListener('keydown', function(e) {
 });
 
 // ── Database ──────────────────────────────────────────────────────────────────
+function renderDbRow(r, container, showDel) {
+  const row = document.createElement('div');
+  row.className = 'panel-row db-row';
+  row.id = 'row-' + r.sorszam;
+  const meta = `${(r.idobelyeg||'').slice(0,10)} · ${PRIO_LABEL[r.fontossag]||''}`;
+  row.innerHTML =
+    `<span class="db-row-date">${meta}</span>` +
+    `<span class="db-row-text">${r.tartalom.slice(0,300)}</span>` +
+    (showDel ? `<button class="db-row-del" onclick="deleteRow(${r.sorszam})" title="delete">×</button>` : '');
+  container.appendChild(row);
+  const div = document.createElement('div');
+  div.className = 'panel-divider';
+  div.id = 'div-' + r.sorszam;
+  container.appendChild(div);
+}
+
+window.deleteRow = async function(sorszam) {
+  await torol(sorszam);
+  document.getElementById('row-' + sorszam)?.remove();
+  document.getElementById('div-' + sorszam)?.remove();
+};
+
 async function loadDatabase() {
   const out = document.getElementById('db-list');
   out.innerHTML = '';
@@ -836,7 +903,7 @@ async function loadDatabase() {
   const stat = await statisztika();
   const header = document.createElement('div');
   header.className = 'panel-row';
-  header.innerHTML = `<span class="panel-label">${stat.ossz} entries</span>`;
+  header.innerHTML = `<span class="panel-label">${stat.ossz} entries · ${stat.human} human · ${stat.ai} ai</span>`;
   out.appendChild(header);
 
   const rows = await legutobbi(50, false);
@@ -848,17 +915,7 @@ async function loadDatabase() {
     out.appendChild(empty);
     return;
   }
-  rows.forEach(r => {
-    const row = document.createElement('div');
-    row.className = 'panel-row db-row';
-    row.innerHTML =
-      `<span class="db-row-date">${(r.idobelyeg||'').slice(0,10)}</span>` +
-      `<span class="db-row-text">${r.tartalom.slice(0,300)}</span>`;
-    out.appendChild(row);
-    const div = document.createElement('div');
-    div.className = 'panel-divider';
-    out.appendChild(div);
-  });
+  rows.forEach(r => renderDbRow(r, out, true));
 }
 
 window.toggleSidebar = function() {
