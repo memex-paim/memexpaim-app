@@ -357,11 +357,12 @@ if ('serviceWorker' in navigator) {
     display: none;
     font-size: 11px;
     color: var(--text3);
-    border: 1px solid var(--text3);
-    border-radius: 8px;
-    padding: 1px 7px;
+    border-radius: 4px;
+    padding: 1px 5px;
     cursor: default;
+    transition: color 0.3s;
   }
+  #ctx-badge.warn { color: #f0a500; }
 
   /* ── Mobile ── */
   @media (max-width: 600px) {
@@ -511,18 +512,20 @@ function trimHistory(reservedTokens) {
     if (total > available) break;
     keep.unshift(history[i]);
   }
-  if (keep.length < history.length) {
-    const dropped = history.length - keep.length;
-    ctxBadge.textContent = `↺ ${dropped} forgotten`;
-    ctxBadge.style.display = 'inline';
-  }
   return keep;
 }
 
-function contextPct(systemPrompt) {
+function updateCtxBadge(systemPrompt) {
+  if (history.length === 0) { ctxBadge.style.display = 'none'; return; }
   const sysT = estTokens(systemPrompt);
   const histT = history.reduce((s, h) => s + h.tokens, 0);
-  return Math.round(((sysT + histT) / MAX_TOKENS) * 100);
+  const pct = Math.round(((sysT + histT) / MAX_TOKENS) * 100);
+  ctxBadge.textContent = `ctx ${pct}%`;
+  ctxBadge.style.display = 'inline';
+  ctxBadge.classList.toggle('warn', pct >= 80);
+  ctxBadge.title = pct >= 80
+    ? `Context ${pct}% full — oldest messages are being dropped`
+    : `Context window: ${pct}% used`;
 }
 
 const statusBadge  = document.getElementById('status-badge');
@@ -673,6 +676,7 @@ window.sendMessage = async function() {
     // Save exchange to history
     history.push({ role: 'user', content: text, tokens: estTokens(text) });
     history.push({ role: 'assistant', content: response, tokens: tokens || estTokens(response) });
+    updateCtxBadge(buildSystemPrompt());
 
     const totalSec = ((Date.now() - t0) / 1000).toFixed(1);
     toksDisplay.textContent = Math.round(tokens / (totalSec || 1)) + ' tok/s · ' + totalSec + 's';
