@@ -319,8 +319,9 @@
   <div class="model-select-wrap">
     <select id="model-select" onchange="changeModel(this.value)">
       <option value="Qwen2.5-0.5B-Instruct-q4f32_1-MLC">Qwen2.5 0.5B (~500MB)</option>
-      <option value="gemma-2-2b-it-q4f16_1-MLC">Gemma 2 2B (~1.5GB)</option>
-      <option value="Llama-3.2-1B-Instruct-q4f16_1-MLC">Llama 3.2 1B (~700MB)</option>
+      <!-- TODO: too slow on mobile (~4-5 tok/s) — re-enable when better hw available -->
+      <option value="gemma-2-2b-it-q4f16_1-MLC" disabled>Gemma 2 2B — slow on mobile</option>
+      <option value="Llama-3.2-1B-Instruct-q4f16_1-MLC" disabled>Llama 3.2 1B — slow on mobile</option>
     </select>
   </div>
   <div class="sidebar-footer" id="model-footer">Loading...</div>
@@ -385,14 +386,19 @@
 
 <script type="module">
 import * as webllm from "https://esm.run/@mlc-ai/web-llm@0.2.79";
+import { dbInit, keres } from "./memex-db.js";
 
 const MODELS = {
   "Qwen2.5-0.5B-Instruct-q4f32_1-MLC": "Qwen2.5 0.5B",
-  "gemma-2-2b-it-q4f16_1-MLC":         "Gemma 2 2B",
-  "Llama-3.2-1B-Instruct-q4f16_1-MLC": "Llama 3.2 1B",
+  // TODO: too slow on mobile A54/A56 (~4-5 tok/s) — re-enable when faster hardware
+  // "gemma-2-2b-it-q4f16_1-MLC":         "Gemma 2 2B",
+  // "Llama-3.2-1B-Instruct-q4f16_1-MLC": "Llama 3.2 1B",
 };
 
-const SYSTEM_PROMPT = "You are a concise assistant. Answer in maximum 2-3 short sentences. Be direct. No unnecessary explanations. /no_think";
+const SYSTEM_PROMPT = "You are a concise personal AI assistant. Answer in maximum 3 sentences. Be direct. /no_think";
+
+let dbReady = false;
+dbInit().then(() => { dbReady = true; }).catch(() => {});
 
 let engine = null;
 let busy = false;
@@ -499,9 +505,21 @@ window.sendMessage = async function() {
   chatMessages.scrollTop = chatMessages.scrollHeight;
 
   try {
+    // RAG: keresés az adatbázisban
+    let systemPrompt = SYSTEM_PROMPT;
+    if (dbReady) {
+      const talalatok = await keres(text, 5);
+      if (talalatok.length > 0) {
+        systemPrompt += '\n\n=== YOUR MEMORY DATABASE ===\n';
+        talalatok.forEach(r => {
+          systemPrompt += `[${(r.idobelyeg||'').slice(0,10)}] ${r.tartalom.slice(0,200)}\n`;
+        });
+      }
+    }
+
     const stream = await engine.chat.completions.create({
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: systemPrompt },
         { role: 'user', content: text }
       ],
       stream: true,
