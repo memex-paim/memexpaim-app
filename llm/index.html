@@ -520,13 +520,23 @@ if ('serviceWorker' in navigator) {
 
   <!-- Search panel -->
   <div class="panel" id="panel-search">
-    <div class="panel-input-wrap">
+    <div class="panel-input-wrap" style="padding-bottom:8px;">
       <div class="panel-input-box">
         <input type="text" id="search-input" placeholder="Search memory..."
-          oninput="searchDebounce()" />
+          oninput="searchDebounce()"
+          onkeydown="if(event.key==='Enter') runSearch()" />
+        <button class="panel-btn" onclick="runSearch()">↵</button>
       </div>
     </div>
-    <div class="panel-content" id="search-results"></div>
+    <div style="padding:0 24px 12px;max-width:680px;margin:0 auto;width:100%;display:flex;gap:6px;align-items:center;">
+      <button class="prio-btn sel" id="filt-all"   onclick="searchFilter('all')"   style="flex:0 0 auto;padding:4px 12px;">All</button>
+      <button class="prio-btn"     id="filt-human" onclick="searchFilter('human')" style="flex:0 0 auto;padding:4px 12px;">Human</button>
+      <button class="prio-btn"     id="filt-ai"    onclick="searchFilter('ai')"    style="flex:0 0 auto;padding:4px 12px;">AI</button>
+      <span id="search-count" style="font-size:11px;color:var(--text3);margin-left:auto;"></span>
+    </div>
+    <div class="panel-content" id="search-results">
+      <div class="panel-row" style="color:var(--text3);font-size:13px;">Type to search…</div>
+    </div>
   </div>
 
   <!-- Entry panel -->
@@ -904,24 +914,61 @@ window.showPanel = function(name) {
 
 // ── Search ────────────────────────────────────────────────────────────────────
 let searchTimer = null;
+let searchIro = 'all';
+
 window.searchDebounce = function() {
   clearTimeout(searchTimer);
   searchTimer = setTimeout(runSearch, 300);
 };
 
+window.searchFilter = function(iro) {
+  searchIro = iro;
+  ['all','human','ai'].forEach(f => {
+    document.getElementById('filt-' + f).classList.toggle('sel', f === iro);
+  });
+  runSearch();
+};
+
 const PRIO_LABEL = { 1: 'critical', 2: 'important', 3: 'normal', 4: 'casual' };
 
-async function runSearch() {
+window.runSearch = async function() {
   const q = document.getElementById('search-input').value.trim();
   const out = document.getElementById('search-results');
+  const countEl = document.getElementById('search-count');
   out.innerHTML = '';
-  if (!q || !dbReady) return;
-  const hits = await keres(q, 20);
+  if (!q || !dbReady) {
+    countEl.textContent = '';
+    out.innerHTML = '<div class="panel-row" style="color:var(--text3);font-size:13px;">Type to search…</div>';
+    return;
+  }
+  let hits = await keres(q, 50);
+  if (searchIro !== 'all') hits = hits.filter(r => r.iro === searchIro);
+  countEl.textContent = hits.length ? `${hits.length} result${hits.length > 1 ? 's' : ''}` : '';
   if (!hits.length) {
     out.innerHTML = '<div class="panel-row" style="color:var(--text3);font-size:13px;">No results</div>';
     return;
   }
-  hits.forEach(r => renderDbRow(r, out, false));
+  hits.forEach(r => renderSearchRow(r, out));
+};
+
+function renderSearchRow(r, container) {
+  const row = document.createElement('div');
+  row.className = 'panel-row';
+  row.style.marginBottom = '16px';
+  const tags = (() => { try { const h = JSON.parse(r.horgonyok); return h.length ? h.join(' · ') : ''; } catch { return ''; } })();
+  const meta = [
+    (r.idobelyeg||'').slice(0,10),
+    PRIO_LABEL[r.fontossag] || '',
+    r.iro || ''
+  ].filter(Boolean).join(' · ');
+  row.innerHTML =
+    `<div style="font-size:11px;color:var(--text3);margin-bottom:4px;">${meta}</div>` +
+    `<div style="font-size:14px;color:var(--text2);line-height:1.55;word-break:break-word;">${r.tartalom.slice(0,400)}</div>` +
+    (tags ? `<div style="font-size:11px;color:var(--text3);margin-top:4px;">${tags}</div>` : '');
+  container.appendChild(row);
+  const div = document.createElement('div');
+  div.className = 'panel-divider';
+  container.appendChild(div);
 }
 
 // ── Entry ─────────────────────────────────────────────────────────────────────
