@@ -499,6 +499,7 @@ if ('serviceWorker' in navigator) {
   <div class="nav-item" onclick="showPanel('rss')">RSS</div>
   <div class="nav-item" onclick="showPanel('database')">Database</div>
   <div class="nav-item" onclick="showPanel('export')">Export</div>
+  <div class="nav-item" onclick="showPanel('debug')">Debug</div>
   <!-- TODO: model selector — disabled, re-enable when multi-model needed
   <div class="model-select-wrap">
     <select id="model-select" onchange="changeModel(this.value)">
@@ -654,6 +655,11 @@ if ('serviceWorker' in navigator) {
       </div>
 
     </div>
+  </div>
+
+  <!-- Debug panel -->
+  <div class="panel" id="panel-debug">
+    <div class="panel-content" id="debug-content"></div>
   </div>
 
 </div>
@@ -981,7 +987,88 @@ window.showPanel = function(name) {
   if (window.innerWidth <= 600) document.getElementById('sidebar').classList.add('hidden');
   if (name === 'database') loadDatabase();
   if (name === 'rss') loadRSSPanel();
+  if (name === 'debug') loadDebugPanel();
 };
+
+// ── Debug panel ──────────────────────────────────────────────────────────────
+
+async function loadDebugPanel() {
+  const el = document.getElementById('debug-content');
+  el.innerHTML = '<div class="panel-row" style="color:var(--text3);font-size:13px;">Loading…</div>';
+
+  const rows = [];
+
+  // ── Model ──
+  rows.push({ label: 'Model', value: engine ? (MODELS[Object.keys(MODELS)[0]] || 'loaded') : 'not loaded' });
+  rows.push({ label: 'WebGPU', value: navigator.gpu ? 'available' : 'NOT available' });
+
+  // ── DB stats ──
+  if (dbReady) {
+    const all = await legutobbi(9999, false);
+    const byType = {};
+    all.forEach(r => { byType[r.iro] = (byType[r.iro] || 0) + 1; });
+    rows.push({ label: 'DB total', value: all.length + ' entries' });
+    Object.entries(byType).sort((a,b) => b[1]-a[1]).forEach(([k,v]) => {
+      rows.push({ label: '  · ' + (k||'human'), value: v + ' entries' });
+    });
+  } else {
+    rows.push({ label: 'DB', value: 'not ready' });
+  }
+
+  // ── RSS ──
+  const lastSync = localStorage.getItem('rss_last_sync');
+  rows.push({ label: 'RSS last sync', value: lastSync ? new Date(lastSync).toLocaleString() : 'never' });
+
+  // ── Context ──
+  rows.push({ label: 'Chat history', value: history.length + ' messages' });
+
+  // ── Browser ──
+  rows.push({ label: 'User agent', value: navigator.userAgent.slice(0, 80) });
+
+  // ── Render ──
+  el.innerHTML = '';
+
+  // Stats table
+  const table = document.createElement('div');
+  table.className = 'panel-row';
+  table.style.cssText = 'font-size:13px;';
+  rows.forEach(r => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;justify-content:space-between;gap:16px;padding:5px 0;border-bottom:1px solid var(--border);';
+    row.innerHTML = `<span style="color:var(--text3)">${r.label}</span><span style="color:var(--text2);text-align:right;word-break:break-all">${r.value}</span>`;
+    table.appendChild(row);
+  });
+  el.appendChild(table);
+
+  // Last 10 DB entries
+  if (dbReady) {
+    const recent = await legutobbi(10, false);
+    if (recent.length) {
+      const hdr = document.createElement('div');
+      hdr.className = 'panel-label';
+      hdr.style.cssText = 'margin-top:20px;';
+      hdr.textContent = 'Last 10 entries';
+      el.appendChild(hdr);
+
+      recent.forEach(r => {
+        const d = document.createElement('div');
+        d.style.cssText = 'padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;';
+        const meta = `<span style="color:var(--text3)">[${(r.idobelyeg||'').slice(0,16)}] <b>${r.iro||'human'}</b></span>`;
+        const txt = r.tartalom.slice(0, 120).replace(/</g,'&lt;');
+        d.innerHTML = `${meta}<br><span style="color:var(--text2)">${txt}${r.tartalom.length > 120 ? '…' : ''}</span>`;
+        el.appendChild(d);
+      });
+    }
+  }
+
+  // Clear chat history button
+  const clearBtn = document.createElement('button');
+  clearBtn.className = 'panel-btn';
+  clearBtn.style.cssText = 'margin-top:20px;border:1px solid var(--text3);border-radius:6px;color:var(--text3);padding:6px 16px;';
+  clearBtn.textContent = 'Clear chat history';
+  clearBtn.onclick = () => { history.length = 0; clearBtn.textContent = 'Cleared ✓'; setTimeout(() => { clearBtn.textContent = 'Clear chat history'; }, 1500); };
+  el.appendChild(clearBtn);
+}
 
 // ── Search ────────────────────────────────────────────────────────────────────
 let searchTimer = null;
