@@ -474,6 +474,7 @@ if ('serviceWorker' in navigator) {
   <div class="nav-item active" onclick="showPanel('chat')">Chat</div>
   <div class="nav-item" onclick="showPanel('search')">Search</div>
   <div class="nav-item" onclick="showPanel('entry')">Entry</div>
+  <div class="nav-item" onclick="showPanel('rss')">RSS</div>
   <div class="nav-item" onclick="showPanel('database')">Database</div>
   <div class="nav-item" onclick="showPanel('export')">Export</div>
   <!-- TODO: model selector — disabled, re-enable when multi-model needed
@@ -565,6 +566,24 @@ if ('serviceWorker' in navigator) {
         <button class="panel-btn" style="padding:6px 16px;border:1px solid var(--text3);border-radius:6px;color:var(--text2);" onclick="saveEntry()">Save</button>
         <span class="flash" id="entry-flash"></span>
       </div>
+    </div>
+  </div>
+
+  <!-- RSS panel -->
+  <div class="panel" id="panel-rss">
+    <div class="panel-content">
+      <div class="panel-row" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <button class="panel-btn" id="rss-sync-btn" style="border:1px solid var(--text3);border-radius:6px;color:var(--text2);padding:6px 16px;" onclick="syncRSS()">Sync</button>
+        <span id="rss-status" style="font-size:12px;color:var(--text3);">—</span>
+        <span id="rss-count" style="font-size:11px;color:var(--text3);margin-left:auto;"></span>
+      </div>
+      <div class="panel-row" id="rss-prog-wrap" style="display:none;padding-top:4px;">
+        <div style="width:100%;height:3px;background:var(--bg3);border-radius:2px;overflow:hidden;margin-bottom:6px;">
+          <div id="rss-prog-bar" style="height:100%;width:0%;background:var(--accent);transition:width 0.2s;"></div>
+        </div>
+        <div id="rss-prog-text" style="font-size:11px;color:var(--text3);"></div>
+      </div>
+      <div id="rss-feed-list" style="margin-top:8px;"></div>
     </div>
   </div>
 
@@ -775,6 +794,9 @@ window.sendMessage = async function() {
   const text = input.value.trim();
   if (!text || busy || !engine) return;
 
+  // Background RSS sync if >24h since last sync (non-blocking)
+  rssMaybeSync();
+
   busy = true;
   input.value = '';
   input.style.height = 'auto';
@@ -910,6 +932,7 @@ window.showPanel = function(name) {
     name.charAt(0).toUpperCase() + name.slice(1);
   if (window.innerWidth <= 600) document.getElementById('sidebar').classList.add('hidden');
   if (name === 'database') loadDatabase();
+  if (name === 'rss') loadRSSPanel();
 };
 
 // ── Search ────────────────────────────────────────────────────────────────────
@@ -942,6 +965,7 @@ window.runSearch = async function() {
     return;
   }
   let hits = await keres(q, 50);
+  hits = hits.filter(r => r.iro !== 'rss'); // RSS entries are RAG-only, not for manual search
   if (searchIro !== 'all') hits = hits.filter(r => r.iro === searchIro);
   countEl.textContent = hits.length ? `${hits.length} result${hits.length > 1 ? 's' : ''}` : '';
   if (!hits.length) {
@@ -1061,7 +1085,260 @@ window.toggleSidebar = function() {
   document.getElementById('sidebar').classList.toggle('hidden');
 };
 
+// ── RSS ───────────────────────────────────────────────────────────────────────
+
+const RSS_FEEDS = [
+  // World News
+  {url:'http://feeds.bbci.co.uk/news/rss.xml',name:'BBC News',cat:'World'},
+  {url:'http://feeds.bbci.co.uk/news/world/rss.xml',name:'BBC World',cat:'World'},
+  {url:'https://feeds.reuters.com/reuters/topNews',name:'Reuters Top',cat:'World'},
+  {url:'https://feeds.reuters.com/reuters/worldNews',name:'Reuters World',cat:'World'},
+  {url:'https://feeds.npr.org/1001/rss.xml',name:'NPR News',cat:'World'},
+  {url:'http://rss.cnn.com/rss/edition.rss',name:'CNN Edition',cat:'World'},
+  {url:'http://rss.cnn.com/rss/edition_world.rss',name:'CNN World',cat:'World'},
+  {url:'https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml',name:'NYT Home',cat:'World'},
+  {url:'https://rss.nytimes.com/services/xml/rss/nyt/World.xml',name:'NYT World',cat:'World'},
+  {url:'https://www.theguardian.com/world/rss',name:'Guardian World',cat:'World'},
+  {url:'https://www.aljazeera.com/xml/rss/all.xml',name:'Al Jazeera',cat:'World'},
+  {url:'https://abcnews.go.com/abcnews/topstories',name:'ABC News',cat:'World'},
+  {url:'https://feeds.skynews.com/feeds/rss/world.xml',name:'Sky News World',cat:'World'},
+  {url:'https://www.cbsnews.com/latest/rss/main',name:'CBS News',cat:'World'},
+  {url:'https://www.economist.com/the-world-this-week/rss.xml',name:'Economist Week',cat:'World'},
+  {url:'https://rss.dw.com/xml/rss-en-world',name:'DW World',cat:'World'},
+  {url:'https://feeds.feedburner.com/euronews/en/news',name:'Euronews',cat:'World'},
+  {url:'https://www.france24.com/en/rss',name:'France 24',cat:'World'},
+  // US News
+  {url:'https://rss.nytimes.com/services/xml/rss/nyt/US.xml',name:'NYT US',cat:'US'},
+  {url:'https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml',name:'NYT Politics',cat:'US'},
+  {url:'http://feeds.washingtonpost.com/rss/politics',name:'WaPo Politics',cat:'US'},
+  {url:'https://feeds.npr.org/1003/rss.xml',name:'NPR US',cat:'US'},
+  {url:'http://rss.cnn.com/rss/edition_us.rss',name:'CNN US',cat:'US'},
+  {url:'https://www.politico.com/rss/politicopicks.xml',name:'Politico',cat:'US'},
+  {url:'https://thehill.com/rss/syndicator/19110',name:'The Hill',cat:'US'},
+  {url:'https://www.axios.com/feeds/feed.rss',name:'Axios',cat:'US'},
+  {url:'https://www.vox.com/rss/index.xml',name:'Vox',cat:'US'},
+  // Business
+  {url:'http://feeds.marketwatch.com/marketwatch/topstories/',name:'MarketWatch',cat:'Business'},
+  {url:'https://www.cnbc.com/id/100003114/device/rss/rss.html',name:'CNBC Markets',cat:'Business'},
+  {url:'https://feeds.a.dj.com/rss/RSSWorldNews.xml',name:'WSJ World',cat:'Business'},
+  {url:'https://feeds.a.dj.com/rss/RSSMarketsMain.xml',name:'WSJ Markets',cat:'Business'},
+  {url:'https://www.economist.com/finance-and-economics/rss.xml',name:'Economist Finance',cat:'Business'},
+  {url:'https://www.economist.com/business/rss.xml',name:'Economist Business',cat:'Business'},
+  {url:'https://hbr.org/subscriberservices/rss/harvard-business-review.xml',name:'HBR',cat:'Business'},
+  {url:'https://www.forbes.com/business/feed2/',name:'Forbes Business',cat:'Business'},
+  {url:'https://fortune.com/feed/',name:'Fortune',cat:'Business'},
+  // Technology
+  {url:'https://techcrunch.com/feed/',name:'TechCrunch',cat:'Tech'},
+  {url:'https://techcrunch.com/category/artificial-intelligence/feed/',name:'TechCrunch AI',cat:'Tech'},
+  {url:'https://www.theverge.com/rss/index.xml',name:'The Verge',cat:'Tech'},
+  {url:'http://feeds.arstechnica.com/arstechnica/index',name:'Ars Technica',cat:'Tech'},
+  {url:'https://www.wired.com/feed/rss',name:'Wired',cat:'Tech'},
+  {url:'https://news.ycombinator.com/rss',name:'Hacker News',cat:'Tech'},
+  {url:'https://www.engadget.com/rss.xml',name:'Engadget',cat:'Tech'},
+  {url:'https://venturebeat.com/category/ai/feed/',name:'VentureBeat AI',cat:'Tech'},
+  {url:'https://thenextweb.com/feed/',name:'TNW',cat:'Tech'},
+  {url:'https://www.zdnet.com/news/rss.xml',name:'ZDNet',cat:'Tech'},
+  {url:'https://www.cnet.com/rss/news/',name:'CNET',cat:'Tech'},
+  {url:'https://feeds.feedburner.com/slashdot/eqWf',name:'Slashdot',cat:'Tech'},
+  {url:'https://stackoverflow.blog/feed/',name:'Stack Overflow Blog',cat:'Tech'},
+  {url:'https://github.blog/feed/',name:'GitHub Blog',cat:'Tech'},
+  {url:'https://feeds.feedburner.com/TheHackersNews',name:'The Hacker News',cat:'Tech'},
+  {url:'https://www.bleepingcomputer.com/feed/',name:'BleepingComputer',cat:'Tech'},
+  // AI
+  {url:'https://openai.com/blog/rss.xml',name:'OpenAI Blog',cat:'AI'},
+  {url:'https://blog.google/technology/ai/rss/',name:'Google AI',cat:'AI'},
+  {url:'https://www.deepmind.com/blog/rss.xml',name:'DeepMind',cat:'AI'},
+  {url:'https://huggingface.co/blog/feed.xml',name:'HuggingFace',cat:'AI'},
+  {url:'https://towardsdatascience.com/feed',name:'Towards Data Science',cat:'AI'},
+  {url:'https://www.technologyreview.com/topic/artificial-intelligence/feed',name:'MIT Tech Review AI',cat:'AI'},
+  {url:'https://bair.berkeley.edu/blog/feed.xml',name:'BAIR Blog',cat:'AI'},
+  // Science
+  {url:'https://www.sciencedaily.com/rss/all.xml',name:'Science Daily',cat:'Science'},
+  {url:'https://www.nasa.gov/rss/dyn/breaking_news.rss',name:'NASA',cat:'Science'},
+  {url:'http://rss.sciam.com/ScientificAmerican-Global',name:'Scientific American',cat:'Science'},
+  {url:'https://www.newscientist.com/feed/home/',name:'New Scientist',cat:'Science'},
+  {url:'https://www.nature.com/nature.rss',name:'Nature',cat:'Science'},
+  {url:'https://phys.org/rss-feed/',name:'Phys.org',cat:'Science'},
+  {url:'https://www.space.com/feeds/all',name:'Space.com',cat:'Science'},
+  {url:'https://feeds.bbci.co.uk/news/science_and_environment/rss.xml',name:'BBC Science',cat:'Science'},
+  // Health
+  {url:'https://rssfeeds.webmd.com/rss/rss.aspx?RSSSource=RSS_PUBLIC',name:'WebMD',cat:'Health'},
+  {url:'https://www.medicalnewstoday.com/rss',name:'Medical News Today',cat:'Health'},
+  {url:'https://www.healthline.com/rss/health-news',name:'Healthline',cat:'Health'},
+  {url:'https://feeds.bbci.co.uk/news/health/rss.xml',name:'BBC Health',cat:'Health'},
+  {url:'https://www.who.int/rss-feeds/news-english.xml',name:'WHO',cat:'Health'},
+  // Sports
+  {url:'http://feeds.bbci.co.uk/sport/rss.xml',name:'BBC Sport',cat:'Sports'},
+  {url:'https://www.espn.com/espn/rss/news',name:'ESPN',cat:'Sports'},
+  {url:'https://www.espn.com/espn/rss/soccer/news',name:'ESPN Soccer',cat:'Sports'},
+  {url:'https://www.skysports.com/rss/12040',name:'Sky Sports',cat:'Sports'},
+  {url:'https://www.sportingnews.com/rss',name:'Sporting News',cat:'Sports'},
+  // Environment
+  {url:'https://www.theguardian.com/environment/rss',name:'Guardian Environment',cat:'Environment'},
+  {url:'https://e360.yale.edu/feed',name:'Yale E360',cat:'Environment'},
+  {url:'https://www.carbonbrief.org/feed',name:'Carbon Brief',cat:'Environment'},
+  {url:'https://insideclimatenews.org/feed/',name:'Inside Climate News',cat:'Environment'},
+  // Politics
+  {url:'https://foreignpolicy.com/feed/',name:'Foreign Policy',cat:'Politics'},
+  {url:'https://www.foreignaffairs.com/rss.xml',name:'Foreign Affairs',cat:'Politics'},
+  {url:'https://www.brookings.edu/feed/',name:'Brookings',cat:'Politics'},
+  // Culture
+  {url:'https://variety.com/feed/',name:'Variety',cat:'Culture'},
+  {url:'https://www.rollingstone.com/feed/',name:'Rolling Stone',cat:'Culture'},
+  {url:'https://pitchfork.com/rss/news/feed.xml',name:'Pitchfork',cat:'Culture'},
+  // Reddit
+  {url:'https://www.reddit.com/r/worldnews/.rss',name:'r/worldnews',cat:'Reddit'},
+  {url:'https://www.reddit.com/r/technology/.rss',name:'r/technology',cat:'Reddit'},
+  {url:'https://www.reddit.com/r/science/.rss',name:'r/science',cat:'Reddit'},
+  {url:'https://www.reddit.com/r/artificial/.rss',name:'r/artificial',cat:'Reddit'},
+  {url:'https://www.reddit.com/r/MachineLearning/.rss',name:'r/MachineLearning',cat:'Reddit'},
+  {url:'https://www.reddit.com/r/programming/.rss',name:'r/programming',cat:'Reddit'},
+  {url:'https://www.reddit.com/r/space/.rss',name:'r/space',cat:'Reddit'},
+  {url:'https://www.reddit.com/r/futurology/.rss',name:'r/futurology',cat:'Reddit'},
+  {url:'https://www.reddit.com/r/economics/.rss',name:'r/economics',cat:'Reddit'},
+  // Weather
+  {url:'https://www.severe-weather.eu/feed/',name:'Severe Weather EU',cat:'Weather'},
+  {url:'https://www.reddit.com/r/weather/.rss',name:'r/weather',cat:'Weather'},
+];
+
+async function fetchFeed(url) {
+  const proxy = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
+  const res = await fetch(proxy, { signal: AbortSignal.timeout(8000) });
+  if (!res.ok) throw new Error(res.status);
+  const text = await res.text();
+  const doc = new DOMParser().parseFromString(text, 'application/xml');
+  const items = [...doc.querySelectorAll('item, entry')];
+  return items.slice(0, 8).map(item => {
+    const title = item.querySelector('title')?.textContent?.trim() || '';
+    const raw = item.querySelector('description, summary, content')?.textContent?.trim() || '';
+    const desc = raw.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').slice(0, 250);
+    const linkEl = item.querySelector('link');
+    const link = linkEl?.textContent?.trim() || linkEl?.getAttribute('href') || '';
+    return { title, desc, link };
+  }).filter(i => i.title);
+}
+
+async function cleanRssDB() {
+  const all = await legutobbi(5000, false);
+  const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const old = all.filter(r => r.iro === 'rss' && new Date(r.idobelyeg).getTime() < cutoff);
+  await Promise.all(old.map(r => torol(r.sorszam)));
+}
+
+let rssSyncing = false;
+
+window.syncRSS = async function() {
+  if (rssSyncing || !dbReady) return;
+  rssSyncing = true;
+
+  const syncBtn = document.getElementById('rss-sync-btn');
+  const statusEl = document.getElementById('rss-status');
+  const progWrap = document.getElementById('rss-prog-wrap');
+  const progBar  = document.getElementById('rss-prog-bar');
+  const progText = document.getElementById('rss-prog-text');
+
+  syncBtn.disabled = true;
+  progWrap.style.display = 'block';
+  progBar.style.width = '0%';
+  progText.textContent = 'Cleaning old entries…';
+
+  await cleanRssDB();
+
+  // build dedup set from existing RSS entries
+  const existing = await legutobbi(5000, false);
+  const seenUrls = new Set(
+    existing
+      .filter(r => r.iro === 'rss')
+      .map(r => { const m = r.tartalom.match(/\nURL: (.+)$/m); return m ? m[1] : ''; })
+      .filter(Boolean)
+  );
+
+  let done = 0, saved = 0;
+  const total = RSS_FEEDS.length;
+  const BATCH = 8;
+
+  for (let i = 0; i < total; i += BATCH) {
+    const batch = RSS_FEEDS.slice(i, i + BATCH);
+    await Promise.all(batch.map(async feed => {
+      try {
+        const items = await fetchFeed(feed.url);
+        for (const item of items) {
+          if (!item.link || seenUrls.has(item.link)) continue;
+          seenUrls.add(item.link);
+          const tartalom = `[${feed.cat}] ${feed.name}: ${item.title}\n${item.desc}\nURL: ${item.link}`;
+          await bejegyez({ tartalom, iro: 'rss', horgonyok: [feed.cat, feed.name], fontossag: 3 });
+          saved++;
+        }
+      } catch { /* skip failed feeds */ }
+      done++;
+      progBar.style.width = Math.round((done / total) * 100) + '%';
+      progText.textContent = `${done}/${total} feeds · ${saved} new articles`;
+    }));
+  }
+
+  const now = new Date();
+  localStorage.setItem('rss_last_sync', now.toISOString());
+  progWrap.style.display = 'none';
+  syncBtn.disabled = false;
+  rssSyncing = false;
+  loadRSSPanel();
+};
+
+async function loadRSSPanel() {
+  const statusEl = document.getElementById('rss-status');
+  const countEl  = document.getElementById('rss-count');
+  const listEl   = document.getElementById('rss-feed-list');
+
+  const lastSync = localStorage.getItem('rss_last_sync');
+  if (lastSync) {
+    const d = new Date(lastSync);
+    const h = String(d.getHours()).padStart(2,'0');
+    const m = String(d.getMinutes()).padStart(2,'0');
+    statusEl.textContent = `Last sync: ${d.toLocaleDateString()} ${h}:${m}`;
+  } else {
+    statusEl.textContent = 'Never synced';
+  }
+
+  if (dbReady) {
+    const all = await legutobbi(5000, false);
+    const rssEntries = all.filter(r => r.iro === 'rss');
+    const cats = {};
+    rssEntries.forEach(r => {
+      try { const h = JSON.parse(r.horgonyok); if (h[0]) cats[h[0]] = (cats[h[0]] || 0) + 1; } catch {}
+    });
+    countEl.textContent = rssEntries.length ? `${rssEntries.length} articles in DB` : '';
+
+    listEl.innerHTML = '';
+    if (Object.keys(cats).length) {
+      const catDiv = document.createElement('div');
+      catDiv.className = 'panel-row';
+      catDiv.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;';
+      for (const [cat, n] of Object.entries(cats).sort((a,b) => b[1]-a[1])) {
+        const span = document.createElement('span');
+        span.style.cssText = 'font-size:11px;color:var(--text3);border:1px solid var(--border);border-radius:4px;padding:2px 8px;';
+        span.textContent = `${cat} ${n}`;
+        catDiv.appendChild(span);
+      }
+      listEl.appendChild(catDiv);
+    }
+  }
+}
+
+// Auto-sync: once per day — triggers on app open AND on first AI message
+function rssNeedsSync() {
+  const last = localStorage.getItem('rss_last_sync');
+  if (!last) return false; // never synced → user triggers first sync manually
+  return Date.now() - new Date(last).getTime() > 24 * 60 * 60 * 1000;
+}
+
+function rssMaybeSync() {
+  if (!rssSyncing && rssNeedsSync()) window.syncRSS();
+}
+
 initModel('Qwen2.5-0.5B-Instruct-q4f32_1-MLC');
+
+// Auto-sync on app open (non-blocking, after DB ready)
+dbInit().then(() => rssMaybeSync()).catch(() => {});
 </script>
 </body>
 </html>
