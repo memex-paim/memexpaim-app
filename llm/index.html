@@ -458,10 +458,12 @@ const SYSTEM_PROMPT_BASE = "You are a concise personal AI assistant. Answer in m
 function buildSystemPrompt() {
   const now = new Date();
   const dateStr = now.toISOString().slice(0, 10);
-  const h = String(now.getHours()).padStart(2, '0');
+  const hours = now.getHours();
+  const h = String(hours).padStart(2, '0');
   const m = String(now.getMinutes()).padStart(2, '0');
   const timeStr = h + ':' + m;
-  return `Today is ${dateStr}, time is ${timeStr} (24h format).\n${SYSTEM_PROMPT_BASE}`;
+  const period = hours < 5 ? 'night' : hours < 12 ? 'morning' : hours < 17 ? 'afternoon' : hours < 21 ? 'evening' : 'night';
+  return `Today is ${dateStr}, time is ${timeStr} (${period}).\n${SYSTEM_PROMPT_BASE}`;
 }
 
 let dbReady = false;
